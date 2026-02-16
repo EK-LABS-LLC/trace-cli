@@ -29,10 +29,6 @@ impl ClaudeCodeHook {
         })
     }
 
-    pub fn source(&self) -> &'static str {
-        CLAUDE_SOURCE
-    }
-
     fn read_settings(&self) -> Result<Option<Value>> {
         match fs::read_to_string(&self.settings_path) {
             Ok(contents) => {

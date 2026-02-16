@@ -23,15 +23,10 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Interactive setup for API access
     Init,
-    /// Inject hooks into detected tools
     Connect,
-    /// Remove previously injected hooks
     Disconnect,
-    /// Show current configuration and tool status
     Status,
-    /// Emit an event (used internally by hooks)
     Emit(EmitArgs),
 }
 

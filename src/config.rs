@@ -36,10 +36,6 @@ impl ConfigStore {
         Ok(Self::config_dir()?.join(CONFIG_FILE))
     }
 
-    pub fn exists() -> Result<bool> {
-        Ok(Self::config_path()?.exists())
-    }
-
     pub fn load() -> Result<PulseConfig> {
         let path = Self::config_path()?;
         let contents = fs::read_to_string(path).map_err(|err| {
