@@ -10,10 +10,17 @@ use super::{HookStatus, ToolHook};
 const CLAUDE_SETTINGS: &str = ".claude/settings.json";
 const CLAUDE_TOOL_NAME: &str = "Claude Code";
 pub const CLAUDE_SOURCE: &str = "claude_code";
-const HOOK_DEFINITIONS: &[(&str, &str)] = &[
+pub const HOOK_DEFINITIONS: &[(&str, &str)] = &[
+    ("PreToolUse", "pulse emit pre_tool_use"),
     ("PostToolUse", "pulse emit post_tool_use"),
-    ("Stop", "pulse emit stop"),
+    ("PostToolUseFailure", "pulse emit post_tool_use_failure"),
     ("SessionStart", "pulse emit session_start"),
+    ("SessionEnd", "pulse emit session_end"),
+    ("Stop", "pulse emit stop"),
+    ("SubagentStart", "pulse emit subagent_start"),
+    ("SubagentStop", "pulse emit subagent_stop"),
+    ("UserPromptSubmit", "pulse emit user_prompt_submit"),
+    ("Notification", "pulse emit notification"),
 ];
 
 #[derive(Debug, Clone)]
@@ -160,7 +167,8 @@ impl ClaudeCodeHook {
                 self.settings_path.clone(),
             ));
         };
-        let connected = has_all_hooks(&value);
+        let (installed, total, names) = installed_hook_counts(&value);
+        let connected = installed == total;
         Ok(HookStatus {
             tool: self.tool_name(),
             detected: true,
@@ -168,6 +176,9 @@ impl ClaudeCodeHook {
             modified: false,
             path: Some(self.settings_path.clone()),
             message: None,
+            installed_hooks: installed,
+            total_hooks: total,
+            installed_hook_names: names,
         })
     }
 }
@@ -193,7 +204,8 @@ impl ToolHook for ClaudeCodeHook {
         if changed {
             self.write_settings(&value)?;
         }
-        let connected = has_all_hooks(&value);
+        let (installed, total, names) = installed_hook_counts(&value);
+        let connected = installed == total;
         Ok(HookStatus {
             tool: self.tool_name(),
             detected: true,
@@ -201,6 +213,9 @@ impl ToolHook for ClaudeCodeHook {
             modified: changed,
             path: Some(self.settings_path.clone()),
             message: None,
+            installed_hooks: installed,
+            total_hooks: total,
+            installed_hook_names: names,
         })
     }
 
@@ -219,29 +234,36 @@ impl ToolHook for ClaudeCodeHook {
         if changed {
             self.write_settings(&value)?;
         }
+        let (installed, total, names) = installed_hook_counts(&value);
+        let connected = installed == total;
         Ok(HookStatus {
             tool: self.tool_name(),
             detected: true,
-            connected: has_all_hooks(&value),
+            connected,
             modified: changed,
             path: Some(self.settings_path.clone()),
             message: None,
+            installed_hooks: installed,
+            total_hooks: total,
+            installed_hook_names: names,
         })
     }
 }
 
-fn has_all_hooks(value: &Value) -> bool {
+fn installed_hook_counts(value: &Value) -> (usize, usize, Vec<String>) {
+    let total = HOOK_DEFINITIONS.len();
     let hooks_map = match value
         .as_object()
         .and_then(|obj| obj.get("hooks"))
         .and_then(|hooks| hooks.as_object())
     {
         Some(map) => map,
-        None => return false,
+        None => return (0, total, Vec::new()),
     };
 
-    HOOK_DEFINITIONS.iter().all(|(event, command)| {
-        hooks_map
+    let mut names = Vec::new();
+    for (event, command) in HOOK_DEFINITIONS {
+        let present = hooks_map
             .get(*event)
             .and_then(|value| value.as_array())
             .map(|array| {
@@ -249,8 +271,14 @@ fn has_all_hooks(value: &Value) -> bool {
                     .iter()
                     .any(|entry| entry_contains_command(entry, command))
             })
-            .unwrap_or(false)
-    })
+            .unwrap_or(false);
+        if present {
+            names.push((*event).to_string());
+        }
+    }
+
+    let installed = names.len();
+    (installed, total, names)
 }
 
 fn entry_contains_command(entry: &Value, command: &str) -> bool {

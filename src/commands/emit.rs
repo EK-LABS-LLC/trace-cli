@@ -3,23 +3,19 @@ use std::io::{self, Read};
 use chrono::Utc;
 use clap::Args;
 use serde_json::{Value, json};
+use uuid::Uuid;
 
 use crate::{
     config::ConfigStore,
     error::Result,
-    hooks::CLAUDE_SOURCE,
-    http::{EventPayload, TraceHttpClient},
+    hooks::{CLAUDE_SOURCE, span},
+    http::TraceHttpClient,
 };
-
-const DEFAULT_SOURCE: &str = CLAUDE_SOURCE;
 
 #[derive(Debug, Args)]
 pub struct EmitArgs {
     /// Event type (e.g. post_tool_use, stop)
     pub event_type: String,
-    /// Override the event source label (defaults to claude_code)
-    #[arg(long)]
-    pub source: Option<String>,
 }
 
 pub async fn run_emit(args: EmitArgs) {
@@ -27,17 +23,15 @@ pub async fn run_emit(args: EmitArgs) {
 }
 
 async fn emit_inner(args: EmitArgs) -> Result<()> {
-    let EmitArgs { event_type, source } = args;
+    let event_type = args.event_type.trim().to_string();
+    if event_type.is_empty() {
+        return Ok(());
+    }
 
     let config = match ConfigStore::load() {
         Ok(cfg) => cfg,
         Err(_) => return Ok(()),
     };
-
-    let event_type = event_type.trim().to_string();
-    if event_type.is_empty() {
-        return Ok(());
-    }
 
     let mut stdin = String::new();
     if io::stdin().read_to_string(&mut stdin).is_err() {
@@ -53,54 +47,39 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
         Err(_) => return Ok(()),
     };
 
-    let session_id = payload
-        .get("session_id")
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| value.to_string());
+    let mut fields = span::extract(&event_type, &payload);
 
-    let Some(session_id) = session_id else {
-        return Ok(());
+    // Merge cli_version and project_id into metadata
+    let meta = fields
+        .metadata
+        .get_or_insert_with(|| json!({}));
+    if let Some(obj) = meta.as_object_mut() {
+        obj.insert(
+            "cli_version".to_string(),
+            Value::String(env!("CARGO_PKG_VERSION").to_string()),
+        );
+        obj.insert(
+            "project_id".to_string(),
+            Value::String(config.project_id.clone()),
+        );
+    }
+
+    let span = match fields.into_span(
+        Uuid::new_v4().to_string(),
+        Utc::now().to_rfc3339(),
+        event_type,
+        CLAUDE_SOURCE.to_string(),
+    ) {
+        Some(s) => s,
+        None => return Ok(()),
     };
-
-    let tool_name = payload
-        .get("tool_name")
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| value.to_string());
-
-    let source = source
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| value.trim().to_string())
-        .or_else(|| {
-            payload
-                .get("source")
-                .and_then(|value| value.as_str())
-                .map(str::to_string)
-        })
-        .unwrap_or_else(|| DEFAULT_SOURCE.to_string());
 
     let client = match TraceHttpClient::new(&config) {
         Ok(client) => client,
         Err(_) => return Ok(()),
     };
 
-    let event = EventPayload {
-        session_id,
-        event_type,
-        tool_name,
-        timestamp: Utc::now().to_rfc3339(),
-        payload: Some(payload),
-        source,
-        metadata: Some(json!({
-            "cli_version": env!("CARGO_PKG_VERSION"),
-            "project_id": config.project_id.clone(),
-        })),
-    };
-
-    let _ = client.post_events(&[event]).await;
+    let _ = client.post_spans(&[span]).await;
 
     Ok(())
 }

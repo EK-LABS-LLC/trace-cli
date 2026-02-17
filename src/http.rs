@@ -55,14 +55,14 @@ impl TraceHttpClient {
         Ok(())
     }
 
-    pub async fn post_events(&self, events: &[EventPayload]) -> Result<()> {
-        if events.is_empty() {
+    pub async fn post_spans(&self, spans: &[SpanPayload]) -> Result<()> {
+        if spans.is_empty() {
             return Ok(());
         }
-        let url = self.make_url("/v1/events/batch")?;
+        let url = self.make_url("/v1/spans/async")?;
         self.auth_headers(self.client.post(url))
             .timeout(EMIT_TIMEOUT)
-            .json(events)
+            .json(spans)
             .send()
             .await?
             .error_for_status()?;
@@ -76,15 +76,36 @@ fn normalize_base_url(raw: &str) -> Result<Url> {
 }
 
 #[derive(Debug, Serialize)]
-pub struct EventPayload {
+pub struct SpanPayload {
+    pub span_id: String,
     pub session_id: String,
-    pub event_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_name: Option<String>,
+    pub parent_span_id: Option<String>,
     pub timestamp: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload: Option<Value>,
+    pub duration_ms: Option<f64>,
     pub source: String,
+    pub kind: String,
+    pub event_type: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_use_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_input: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_response: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_interrupt: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
 }

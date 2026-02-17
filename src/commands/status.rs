@@ -73,4 +73,17 @@ fn print_hook_status(status: &HookStatus) {
     } else {
         println!("  - {}: disconnected{}", status.tool, suffix);
     }
+
+    if status.total_hooks > 0 {
+        println!(
+            "    {}/{} hooks installed",
+            status.installed_hooks, status.total_hooks
+        );
+        if !status.installed_hook_names.is_empty() {
+            println!("    {}", status.installed_hook_names.join(", "));
+        }
+        if !status.connected && status.installed_hooks < status.total_hooks {
+            println!("    Run `pulse connect` to install missing hooks");
+        }
+    }
 }

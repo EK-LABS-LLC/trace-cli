@@ -1,4 +1,5 @@
 mod claude_code;
+pub mod span;
 
 pub use claude_code::{CLAUDE_SOURCE, ClaudeCodeHook};
 
@@ -13,6 +14,9 @@ pub struct HookStatus {
     pub modified: bool,
     pub path: Option<PathBuf>,
     pub message: Option<String>,
+    pub installed_hooks: usize,
+    pub total_hooks: usize,
+    pub installed_hook_names: Vec<String>,
 }
 
 impl HookStatus {
@@ -27,6 +31,9 @@ impl HookStatus {
                 "Tool not detected. Expected settings at {}",
                 path.display()
             )),
+            installed_hooks: 0,
+            total_hooks: 0,
+            installed_hook_names: Vec::new(),
         }
     }
 }

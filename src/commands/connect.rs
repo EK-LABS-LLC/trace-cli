@@ -60,6 +60,24 @@ fn print_connect_summary(status: &HookStatus) {
             format_path_suffix(status)
         );
     }
+
+    print_hook_details(status);
+}
+
+fn print_hook_details(status: &HookStatus) {
+    if status.total_hooks == 0 {
+        return;
+    }
+    println!(
+        "    {}/{} hooks installed",
+        status.installed_hooks, status.total_hooks
+    );
+    if !status.installed_hook_names.is_empty() {
+        println!("    {}", status.installed_hook_names.join(", "));
+    }
+    if status.installed_hooks < status.total_hooks {
+        println!("    Run `pulse connect` to install missing hooks");
+    }
 }
 
 fn format_path_suffix(status: &HookStatus) -> String {
