@@ -1,73 +1,176 @@
 # Pulse CLI
 
-Rust CLI that installs non-blocking hooks into agentic tools (starting with Claude Code) so that tool lifecycle events (post tool use, stop, session start, …) flow into the Pulse trace service.
+CLI that hooks into Claude Code to capture tool and session events as structured spans, then ships them to the Pulse trace service.
 
-## Getting Started
+## Quick Start
 
-1. **Build** (from repo root):
-   ```bash
-   cd cli
-   cargo build
-   ```
-   This produces `target/debug/cli`.
-2. **Install** (optional) so `pulse` is on your `$PATH`:
-   ```bash
-   cargo install --path cli --force
-   ```
+```bash
+cargo install --path .
+pulse init
+pulse connect
+```
 
-> The CLI reads/writes `~/.pulse/config.toml` and expects Claude Code settings at `~/.claude/settings.json`.
+That's it. Every Claude Code session now sends spans to your trace service.
+
+## Setup
+
+### 1. Build
+
+```bash
+cargo build --release
+```
+
+Binary is at `target/release/pulse`. Or install directly:
+
+```bash
+cargo install --path .
+```
+
+### 2. Initialize
+
+```bash
+pulse init
+```
+
+Prompts for your trace service URL, API key, and project ID. Validates connectivity before saving to `~/.pulse/config.toml`.
+
+For CI/Docker, use flags to skip prompts:
+
+```bash
+pulse init \
+  --api-url https://pulse.example.com \
+  --api-key sk-your-key \
+  --project-id my-project \
+  --no-validate
+```
+
+### 3. Connect Hooks
+
+```bash
+pulse connect
+```
+
+Installs 10 async hooks into `~/.claude/settings.json`:
+
+```
+PreToolUse, PostToolUse, PostToolUseFailure, SessionStart,
+SessionEnd, Stop, SubagentStart, SubagentStop,
+UserPromptSubmit, Notification
+```
+
+Hooks are non-blocking — Claude Code never waits for Pulse.
+
+### 4. Verify
+
+```bash
+pulse status
+```
+
+Shows config, trace service connectivity, and hook status (e.g. `10/10 hooks installed`).
 
 ## Commands
 
-### `pulse init`
-Interactive bootstrap. Prompts for:
-- Trace service URL (e.g. `https://pulse.example.com`)
-- API key (kept locally)
-- Project ID
+| Command | Description |
+|---------|-------------|
+| `pulse init` | Configure trace service connection |
+| `pulse connect` | Install hooks into Claude Code |
+| `pulse disconnect` | Remove all Pulse hooks |
+| `pulse status` | Show config, connectivity, and hook status |
+| `pulse emit <type>` | Send a span (called by hooks, not by users) |
 
-The command pings `/health` before writing config to `~/.pulse/config.toml`.
+## How It Works
 
-### `pulse connect`
-Ensures hooks are present in supported tools. Today only Claude Code is implemented:
-```
-~/.claude/settings.json
-└── hooks
-    ├── PostToolUse
-    ├── Stop
-    └── SessionStart
-```
-Each event runs `pulse emit <event_type>` asynchronously so Claude Code never blocks. The command is idempotent and re-runs safely.
+When Claude Code fires an event (tool call, session start, etc.), it pipes JSON to `pulse emit <event_type>` via the hook. The CLI:
 
-### `pulse disconnect`
-Removes any `pulse emit …` hook entries and cleans up now-empty arrays or hook sections.
+1. Reads the JSON payload from stdin
+2. Extracts structured fields based on event type (tool name, input, response, errors, etc.)
+3. Builds a span with a UUID, timestamp, and metadata
+4. POSTs it to the trace service at `/v1/spans/async`
 
-### `pulse status`
-Prints current configuration, health-checks the trace service, and shows whether hooks are installed per tool.
-
-### `pulse emit <event_type>`
-Hot path invoked by hooks. Reads JSON from STDIN (the payload from Claude Code), wraps it with metadata, and POSTs to `/v1/events/batch`. Design constraints:
-- Exits `0` regardless of failures (missing config, invalid JSON, HTTP error, etc.)
+The `emit` command is designed for the hot path:
+- Exits `0` regardless of failures
 - Never prints to stdout/stderr
-- 2s HTTP timeout
+- 2-second HTTP timeout
 
-Example:
+## Span Schema
+
+Each span sent to the trace service includes:
+
+| Field | Description |
+|-------|-------------|
+| `span_id` | UUID v4 |
+| `session_id` | Claude Code session identifier |
+| `timestamp` | ISO 8601 |
+| `source` | Always `claude_code` |
+| `kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, or `notification` |
+| `event_type` | The specific event (e.g. `post_tool_use`, `session_start`) |
+| `status` | `success` or `error` (only `post_tool_use_failure` is `error`) |
+| `tool_name` | Tool name (for tool events) |
+| `tool_input` | Tool input payload (for tool events) |
+| `tool_response` | Tool response (for post_tool_use) |
+| `error` | Error details (for failures) |
+| `cwd` | Working directory |
+| `model` | Model name (for session_start) |
+| `agent_name` | Subagent type (for subagent events) |
+| `metadata` | Contains `cli_version`, `project_id`, and event-specific data |
+
+## Testing
+
+### Unit Tests
+
 ```bash
-echo '{"session_id":"abc","tool_name":"Terminal","payload":{"cmd":"ls"}}' | \
-  pulse emit post_tool_use
+make test
 ```
 
-## Development Notes
+30 tests covering span extraction, hook install/uninstall, and serialization.
 
-- Modules live in `cli/src/commands/*` while common utilities are in `config.rs`, `http.rs`, `hooks/*`, and `error.rs`.
-- Hooks are defined via the `ToolHook` trait; add additional implementations under `cli/src/hooks/` and register them in `commands/mod.rs`.
-- HTTP requests use `reqwest` with `rustls` to avoid OpenSSL dependencies.
-- Async runtime is the single-threaded Tokio flavor for fast startup.
+### E2E Tests
 
-## Testing Checklist
+Runs Claude Code in Docker, fires real hooks, and validates spans land in the trace service with correct structure.
 
-1. `cargo fmt`
-2. `cargo clippy --all-targets`
-3. `cargo test`
-4. Manual workflow: `pulse init` → `pulse connect` → simulate `pulse emit` → verify event in trace service → `pulse status` → `pulse disconnect`
+```bash
+cp e2e/.env.example e2e/.env
+# Fill in ANTHROPIC_API_KEY, PULSE_API_URL, PULSE_API_KEY
+make e2e-run
+```
 
-(Online access is required for `cargo` to pull crates the first time.)
+Validates 35 assertions: span count, session consistency, UUID format, timestamps, field presence, kind/status mappings, metadata integrity, prompt capture, and cleanup.
+
+### All Make Targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | `cargo build` |
+| `make test` | `cargo test` |
+| `make clean` | `cargo clean` |
+| `make e2e-build` | Build the e2e Docker image |
+| `make e2e-run` | Build and run e2e tests |
+| `make e2e-down` | Tear down e2e containers |
+
+## Project Structure
+
+```
+src/
+  lib.rs              # Library root
+  main.rs             # CLI entrypoint
+  config.rs           # ~/.pulse/config.toml management
+  error.rs            # Error types
+  http.rs             # HTTP client and SpanPayload
+  commands/
+    init.rs           # pulse init
+    connect.rs        # pulse connect
+    disconnect.rs     # pulse disconnect
+    status.rs         # pulse status
+    emit.rs           # pulse emit (hot path)
+  hooks/
+    mod.rs            # ToolHook trait and HookStatus
+    claude_code.rs    # Claude Code hook definitions and settings.json management
+    span.rs           # Span extraction and event type dispatch
+tests/
+  span_test.rs        # Span extraction tests
+  http_test.rs        # Serialization tests
+e2e/
+  Dockerfile          # Multi-stage build (Rust + Node)
+  run.sh              # E2E test script
+  docker-compose.yml  # E2E orchestration
+```

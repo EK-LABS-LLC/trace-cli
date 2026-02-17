@@ -10,7 +10,7 @@ use crate::hooks::{ClaudeCodeHook, ToolHook};
 pub use connect::run_connect;
 pub use disconnect::run_disconnect;
 pub use emit::{EmitArgs, run_emit};
-pub use init::run_init;
+pub use init::{InitArgs, run_init};
 pub use status::run_status;
 
 pub(crate) fn registered_hooks() -> Result<Vec<Box<dyn ToolHook>>> {

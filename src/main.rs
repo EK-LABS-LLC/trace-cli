@@ -1,14 +1,10 @@
-mod commands;
-mod config;
-mod error;
-mod hooks;
-mod http;
-
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
-use commands::{EmitArgs, run_connect, run_disconnect, run_emit, run_init, run_status};
-use error::Result;
+use pulse::commands::{
+    EmitArgs, InitArgs, run_connect, run_disconnect, run_emit, run_init, run_status,
+};
+use pulse::error::Result;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -23,7 +19,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    Init,
+    Init(InitArgs),
     Connect,
     Disconnect,
     Status,
@@ -34,7 +30,7 @@ enum Commands {
 async fn main() -> ExitCode {
     let cli = Cli::parse();
     let result: Result<()> = match cli.command {
-        Commands::Init => run_init().await,
+        Commands::Init(args) => run_init(args).await,
         Commands::Connect => run_connect(),
         Commands::Disconnect => run_disconnect(),
         Commands::Status => run_status().await,

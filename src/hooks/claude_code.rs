@@ -326,3 +326,125 @@ fn entry_is_empty(entry: &Value) -> bool {
         .map(|hooks| hooks.is_empty())
         .unwrap_or(true)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hook_definitions_count() {
+        assert_eq!(HOOK_DEFINITIONS.len(), 10);
+    }
+
+    #[test]
+    fn test_hook_definitions_all_unique_events() {
+        let events: Vec<&str> = HOOK_DEFINITIONS.iter().map(|(e, _)| *e).collect();
+        let mut deduped = events.clone();
+        deduped.sort();
+        deduped.dedup();
+        assert_eq!(events.len(), deduped.len(), "duplicate event names found");
+    }
+
+    #[test]
+    fn test_hook_definitions_all_unique_commands() {
+        let cmds: Vec<&str> = HOOK_DEFINITIONS.iter().map(|(_, c)| *c).collect();
+        let mut deduped = cmds.clone();
+        deduped.sort();
+        deduped.dedup();
+        assert_eq!(cmds.len(), deduped.len(), "duplicate commands found");
+    }
+
+    #[test]
+    fn test_insert_hooks_into_empty_settings() {
+        let mut value = json!({});
+        let changed = ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+        assert!(changed);
+
+        let (installed, total, names) = installed_hook_counts(&value);
+        assert_eq!(installed, 10);
+        assert_eq!(total, 10);
+        assert_eq!(names.len(), 10);
+    }
+
+    #[test]
+    fn test_insert_hooks_is_idempotent() {
+        let mut value = json!({});
+        ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+        let changed = ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+        assert!(!changed, "second insert should not change anything");
+    }
+
+    #[test]
+    fn test_remove_hooks_cleans_up() {
+        let mut value = json!({});
+        ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+        let changed = ClaudeCodeHook::remove_hooks(&mut value).unwrap();
+        assert!(changed);
+
+        let (installed, _, _) = installed_hook_counts(&value);
+        assert_eq!(installed, 0);
+    }
+
+    #[test]
+    fn test_remove_hooks_on_empty_is_noop() {
+        let mut value = json!({});
+        let changed = ClaudeCodeHook::remove_hooks(&mut value).unwrap();
+        assert!(!changed);
+    }
+
+    #[test]
+    fn test_insert_preserves_existing_hooks() {
+        let mut value = json!({
+            "hooks": {
+                "PostToolUse": [{
+                    "matcher": "",
+                    "hooks": [{"type": "command", "command": "other-tool do something"}]
+                }]
+            }
+        });
+        ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+
+        // The existing hook entry should still be there
+        let post_tool = value["hooks"]["PostToolUse"].as_array().unwrap();
+        assert_eq!(post_tool.len(), 2, "should have original + pulse hook");
+    }
+
+    #[test]
+    fn test_remove_only_removes_pulse_hooks() {
+        let mut value = json!({
+            "hooks": {
+                "PostToolUse": [{
+                    "matcher": "",
+                    "hooks": [{"type": "command", "command": "other-tool do something"}]
+                }]
+            }
+        });
+        ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+        ClaudeCodeHook::remove_hooks(&mut value).unwrap();
+
+        // The non-pulse hook should remain
+        let post_tool = value["hooks"]["PostToolUse"].as_array().unwrap();
+        assert_eq!(post_tool.len(), 1);
+        assert!(entry_contains_command(&post_tool[0], "other-tool do something"));
+    }
+
+    #[test]
+    fn test_installed_hook_counts_partial() {
+        // Simulate an old install with only 3 hooks
+        let mut value = json!({});
+        ClaudeCodeHook::insert_hooks(&mut value).unwrap();
+
+        // Remove some hooks manually
+        let hooks_map = value["hooks"].as_object_mut().unwrap();
+        hooks_map.remove("PreToolUse");
+        hooks_map.remove("SubagentStart");
+        hooks_map.remove("SubagentStop");
+
+        let (installed, total, names) = installed_hook_counts(&value);
+        assert_eq!(total, 10);
+        assert_eq!(installed, 7);
+        assert_eq!(names.len(), 7);
+        assert!(!names.contains(&"PreToolUse".to_string()));
+        assert!(!names.contains(&"SubagentStart".to_string()));
+    }
+}
