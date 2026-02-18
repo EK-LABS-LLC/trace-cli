@@ -279,6 +279,17 @@ else
   echo "  No debug log found"
 fi
 
+# ── Step 8: Dump transcript file ──────────────────────────────────
+echo ""
+echo "── Step 8: Transcript file contents"
+TRANSCRIPT=$(grep 'transcript_path' "$PULSE_DEBUG_LOG" | head -1 | sed 's/.*"transcript_path": *"\([^"]*\)".*/\1/')
+if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
+  echo "  Path: $TRANSCRIPT"
+  cat "$TRANSCRIPT"
+else
+  echo "  Transcript not found (path: ${TRANSCRIPT:-none})"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════"
