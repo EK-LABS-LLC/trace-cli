@@ -12,6 +12,30 @@ use crate::{
     http::TraceHttpClient,
 };
 
+fn debug_enabled() -> bool {
+    std::env::var("PULSE_DEBUG").map(|v| v == "1" || v == "true").unwrap_or(false)
+}
+
+fn debug_log(event_type: &str, payload: &Value) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let path = std::env::var("PULSE_DEBUG_LOG")
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .map(|h| h.join(".pulse/debug.log").to_string_lossy().to_string())
+                .unwrap_or_else(|| "/tmp/pulse-debug.log".to_string())
+        });
+
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
+        let ts = Utc::now().to_rfc3339();
+        let pretty = serde_json::to_string_pretty(payload).unwrap_or_default();
+        let _ = writeln!(file, "── [{ts}] {event_type} ──");
+        let _ = writeln!(file, "{pretty}");
+        let _ = writeln!(file);
+    }
+}
+
 #[derive(Debug, Args)]
 pub struct EmitArgs {
     /// Event type (e.g. post_tool_use, stop)
@@ -46,6 +70,10 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
         Ok(value) => value,
         Err(_) => return Ok(()),
     };
+
+    if debug_enabled() {
+        debug_log(&event_type, &payload);
+    }
 
     let mut fields = span::extract(&event_type, &payload);
 

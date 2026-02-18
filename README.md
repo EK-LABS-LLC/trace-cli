@@ -4,6 +4,8 @@ CLI that hooks into Claude Code to capture tool and session events as structured
 
 ## Quick Start
 
+Requires a running [Pulse trace service](https://github.com/EK-LABS-LLC/trace-service) and a Claude Code installation.
+
 ```bash
 cargo install --path .
 pulse init
@@ -92,6 +94,16 @@ The `emit` command is designed for the hot path:
 - Never prints to stdout/stderr
 - 2-second HTTP timeout
 
+### Debugging
+
+Set `PULSE_DEBUG=1` to log raw payloads from Claude Code:
+
+```bash
+export PULSE_DEBUG=1
+```
+
+Writes to `~/.pulse/debug.log` by default. Override with `PULSE_DEBUG_LOG=/path/to/file`.
+
 ## Span Schema
 
 Each span sent to the trace service includes:
@@ -110,7 +122,7 @@ Each span sent to the trace service includes:
 | `tool_response` | Tool response (for post_tool_use) |
 | `error` | Error details (for failures) |
 | `cwd` | Working directory |
-| `model` | Model name (for session_start) |
+| `model` | Model name (if provided by the hook source) |
 | `agent_name` | Subagent type (for subagent events) |
 | `metadata` | Contains `cli_version`, `project_id`, and event-specific data |
 

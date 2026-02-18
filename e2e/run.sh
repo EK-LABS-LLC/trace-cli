@@ -73,6 +73,10 @@ extract_spans() {
   echo "$1" | jq 'if type == "array" then . elif .spans? then .spans elif .data? then .data else [] end'
 }
 
+# Enable debug logging for emit commands
+export PULSE_DEBUG=1
+export PULSE_DEBUG_LOG=/tmp/pulse-debug.log
+
 # ── Step 1: Initialize pulse (non-interactive, skip health check) ──
 echo "── Step 1: pulse init"
 pulse init \
@@ -265,6 +269,15 @@ pulse disconnect
 HOOKS_AFTER=$(cat ~/.claude/settings.json)
 HAS_HOOKS=$(echo "$HOOKS_AFTER" | jq -r 'has("hooks") | tostring')
 assert_eq "hooks removed after disconnect" "false" "$HAS_HOOKS"
+
+# ── Step 7: Dump raw payloads ─────────────────────────────────────
+echo ""
+echo "── Step 7: Raw payloads received from Claude Code"
+if [ -f "$PULSE_DEBUG_LOG" ]; then
+  cat "$PULSE_DEBUG_LOG"
+else
+  echo "  No debug log found"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────
 echo ""
