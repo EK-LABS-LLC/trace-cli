@@ -1,10 +1,14 @@
 # Pulse CLI
 
-CLI that hooks into Claude Code to capture tool and session events as structured spans, then ships them to the Pulse trace service.
+CLI that hooks into AI coding agents to capture tool and session events as structured spans, then ships them to the Pulse trace service.
+
+Supported agents:
+- **Claude Code** — hooks via `~/.claude/settings.json`
+- **OpenCode** — plugin via `~/.config/opencode/plugins/`
 
 ## Quick Start
 
-Requires a running [Pulse trace service](https://github.com/EK-LABS-LLC/trace-service) and a Claude Code installation.
+Requires a running [Pulse trace service](https://github.com/EK-LABS-LLC/trace-service) and at least one supported agent installed.
 
 ```bash
 cargo install --path .
@@ -12,7 +16,7 @@ pulse init
 pulse connect
 ```
 
-That's it. Every Claude Code session now sends spans to your trace service.
+That's it. Pulse auto-detects which agents are installed and wires them up. Every session now sends spans to your trace service.
 
 ## Setup
 
@@ -52,7 +56,9 @@ pulse init \
 pulse connect
 ```
 
-Installs 10 async hooks into `~/.claude/settings.json`:
+Auto-detects installed agents and wires up instrumentation for each one:
+
+**Claude Code** — installs 10 async hooks into `~/.claude/settings.json`:
 
 ```
 PreToolUse, PostToolUse, PostToolUseFailure, SessionStart,
@@ -60,7 +66,9 @@ SessionEnd, Stop, SubagentStart, SubagentStop,
 UserPromptSubmit, Notification
 ```
 
-Hooks are non-blocking — Claude Code never waits for Pulse.
+**OpenCode** — installs a TypeScript plugin at `~/.config/opencode/plugins/pulse-plugin.ts` that hooks into session, message, and tool events via the OpenCode plugin API.
+
+All hooks are non-blocking — your agent never waits for Pulse.
 
 ### 4. Verify
 
@@ -68,26 +76,30 @@ Hooks are non-blocking — Claude Code never waits for Pulse.
 pulse status
 ```
 
-Shows config, trace service connectivity, and hook status (e.g. `10/10 hooks installed`).
+Shows config, trace service connectivity, and hook status for each detected agent (e.g. `10/10 hooks installed` for Claude Code, `1/1 hooks installed` for OpenCode).
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `pulse init` | Configure trace service connection |
-| `pulse connect` | Install hooks into Claude Code |
-| `pulse disconnect` | Remove all Pulse hooks |
+| `pulse connect` | Install hooks into all detected agents |
+| `pulse disconnect` | Remove all Pulse hooks from all agents |
 | `pulse status` | Show config, connectivity, and hook status |
 | `pulse emit <type>` | Send a span (called by hooks, not by users) |
 
 ## How It Works
 
-When Claude Code fires an event (tool call, session start, etc.), it pipes JSON to `pulse emit <event_type>` via the hook. The CLI:
+When an agent fires an event (tool call, session start, etc.), it pipes JSON to `pulse emit <event_type>`. The CLI:
 
 1. Reads the JSON payload from stdin
 2. Extracts structured fields based on event type (tool name, input, response, errors, etc.)
 3. Builds a span with a UUID, timestamp, and metadata
 4. POSTs it to the trace service at `/v1/spans/async`
+
+**Claude Code** calls `pulse emit` directly from its hook system (settings.json commands).
+
+**OpenCode** runs a TypeScript plugin that calls `Bun.spawn(["pulse", "emit", ...])` in response to OpenCode's event/tool hooks.
 
 The `emit` command is designed for the hot path:
 - Exits `0` regardless of failures
@@ -111,9 +123,9 @@ Each span sent to the trace service includes:
 | Field | Description |
 |-------|-------------|
 | `span_id` | UUID v4 |
-| `session_id` | Claude Code session identifier |
+| `session_id` | Agent session identifier |
 | `timestamp` | ISO 8601 |
-| `source` | Always `claude_code` |
+| `source` | `claude_code` or `opencode` |
 | `kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, or `notification` |
 | `event_type` | The specific event (e.g. `post_tool_use`, `session_start`) |
 | `status` | `success` or `error` (only `post_tool_use_failure` is `error`) |
@@ -138,15 +150,21 @@ make test
 
 ### E2E Tests
 
-Runs Claude Code in Docker, fires real hooks, and validates spans land in the trace service with correct structure.
+Runs each agent in Docker, fires real hooks, and validates spans land in the trace service with correct structure.
 
 ```bash
 cp e2e/.env.example e2e/.env
 # Fill in ANTHROPIC_API_KEY, PULSE_API_URL, PULSE_API_KEY
-make e2e-run
+
+# Run all e2e tests (Claude Code + OpenCode):
+docker compose -f e2e/docker-compose.yml up --build
+
+# Run just one:
+docker compose -f e2e/docker-compose.yml up --build e2e          # Claude Code
+docker compose -f e2e/docker-compose.yml up --build e2e-opencode  # OpenCode
 ```
 
-Validates 35 assertions: span count, session consistency, UUID format, timestamps, field presence, kind/status mappings, metadata integrity, prompt capture, and cleanup.
+Each test validates: span count, session consistency, UUID format, timestamps, field presence, source correctness, kind/status mappings, metadata integrity, and cleanup.
 
 ### All Make Targets
 
@@ -177,12 +195,18 @@ src/
   hooks/
     mod.rs            # ToolHook trait and HookStatus
     claude_code.rs    # Claude Code hook definitions and settings.json management
+    opencode.rs       # OpenCode plugin management
     span.rs           # Span extraction and event type dispatch
+plugins/
+  opencode/
+    pulse-plugin.ts   # OpenCode TypeScript plugin (hooks into events + tools)
 tests/
   span_test.rs        # Span extraction tests
   http_test.rs        # Serialization tests
 e2e/
-  Dockerfile          # Multi-stage build (Rust + Node)
-  run.sh              # E2E test script
+  Dockerfile          # Claude Code e2e (Rust + Node)
+  Dockerfile.opencode # OpenCode e2e (Rust + Bun + OpenCode)
+  run.sh              # Claude Code e2e test script
+  opencode-e2e.sh     # OpenCode e2e test script
   docker-compose.yml  # E2E orchestration
 ```

@@ -1,0 +1,28 @@
+FROM rust:1.86-bookworm AS builder
+
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl jq ca-certificates unzip git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bun (required for OpenCode plugin loading)
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
+
+# Install OpenCode
+RUN curl -fsSL https://opencode.ai/install | bash
+ENV PATH="/root/.opencode/bin:$PATH"
+
+# Copy pulse binary from builder
+COPY --from=builder /app/target/release/pulse /usr/local/bin/pulse
+
+ARG TEST_SCRIPT=opencode-e2e.sh
+COPY e2e/${TEST_SCRIPT} /e2e/run.sh
+RUN chmod +x /e2e/run.sh
+
+ENTRYPOINT ["/e2e/run.sh"]

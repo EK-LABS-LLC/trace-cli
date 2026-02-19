@@ -14,6 +14,7 @@ pub struct SpanFields {
     pub model: Option<String>,
     pub agent_name: Option<String>,
     pub metadata: Option<Value>,
+    pub source: Option<String>,
 }
 
 impl SpanFields {
@@ -30,6 +31,7 @@ impl SpanFields {
             model: None,
             agent_name: None,
             metadata: None,
+            source: None,
         }
     }
 
@@ -115,6 +117,8 @@ fn extract_common(payload: &Value) -> SpanFields {
     let mut fields = SpanFields::new();
     fields.session_id = str_field(payload, "session_id");
     fields.cwd = str_field(payload, "cwd");
+    fields.model = str_field(payload, "model");
+    fields.source = str_field(payload, "source");
     fields
 }
 

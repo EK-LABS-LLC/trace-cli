@@ -15,7 +15,8 @@ RUN npm install -g @anthropic-ai/claude-code
 # Copy pulse binary from builder
 COPY --from=builder /app/target/release/pulse /usr/local/bin/pulse
 
-COPY e2e/run.sh /e2e/run.sh
+ARG TEST_SCRIPT=run.sh
+COPY e2e/${TEST_SCRIPT} /e2e/run.sh
 RUN chmod +x /e2e/run.sh
 
 ENTRYPOINT ["/e2e/run.sh"]

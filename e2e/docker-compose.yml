@@ -7,3 +7,34 @@ services:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  e2e-cc-tools:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+      args:
+        TEST_SCRIPT: claude-tools-e2e.sh
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  e2e-opencode:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.opencode
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  e2e-oc-tools:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.opencode
+      args:
+        TEST_SCRIPT: opencode-tools-e2e.sh
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

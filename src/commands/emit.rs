@@ -46,6 +46,13 @@ pub async fn run_emit(args: EmitArgs) {
     let _ = emit_inner(args).await;
 }
 
+fn normalized_source(source: Option<String>) -> String {
+    match source.as_deref() {
+        Some("claude_code" | "opencode" | "openclaw") => source.unwrap(),
+        _ => CLAUDE_SOURCE.to_string(),
+    }
+}
+
 async fn emit_inner(args: EmitArgs) -> Result<()> {
     let event_type = args.event_type.trim().to_string();
     if event_type.is_empty() {
@@ -77,10 +84,13 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
 
     let mut fields = span::extract(&event_type, &payload);
 
-    // Merge cli_version and project_id into metadata
+    // Merge cli_version, project_id, and raw event payload into metadata.
     let meta = fields
         .metadata
         .get_or_insert_with(|| json!({}));
+    if !meta.is_object() {
+        *meta = json!({});
+    }
     if let Some(obj) = meta.as_object_mut() {
         obj.insert(
             "cli_version".to_string(),
@@ -90,13 +100,16 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
             "project_id".to_string(),
             Value::String(config.project_id.clone()),
         );
+        obj.insert("raw".to_string(), payload.clone());
     }
+
+    let source = normalized_source(fields.source.take());
 
     let span = match fields.into_span(
         Uuid::new_v4().to_string(),
         Utc::now().to_rfc3339(),
         event_type,
-        CLAUDE_SOURCE.to_string(),
+        source.clone(),
     ) {
         Some(s) => s,
         None => return Ok(()),

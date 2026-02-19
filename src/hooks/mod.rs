@@ -1,7 +1,11 @@
 mod claude_code;
+mod openclaw;
+mod opencode;
 pub mod span;
 
 pub use claude_code::{CLAUDE_SOURCE, ClaudeCodeHook};
+pub use openclaw::OpenClawHook;
+pub use opencode::OpenCodeHook;
 
 use crate::error::Result;
 use std::path::PathBuf;
