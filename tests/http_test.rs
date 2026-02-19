@@ -76,6 +76,30 @@ fn serialization_includes_optional_fields_when_set() {
 }
 
 #[test]
+fn serialization_includes_usage_in_metadata() {
+    let mut span = minimal_span();
+    span.metadata = Some(json!({
+        "usage": {
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "reasoning_tokens": 10,
+            "cache_read_tokens": 5,
+            "cache_write_tokens": 3,
+            "cost": 0.0042
+        }
+    }));
+
+    let json = serde_json::to_value(&span).unwrap();
+    let usage = &json["metadata"]["usage"];
+    assert_eq!(usage["input_tokens"], 100);
+    assert_eq!(usage["output_tokens"], 50);
+    assert_eq!(usage["reasoning_tokens"], 10);
+    assert_eq!(usage["cache_read_tokens"], 5);
+    assert_eq!(usage["cache_write_tokens"], 3);
+    assert_eq!(usage["cost"], 0.0042);
+}
+
+#[test]
 fn serialization_batch_format() {
     let spans = vec![minimal_span(), minimal_span()];
     let json = serde_json::to_value(&spans).unwrap();

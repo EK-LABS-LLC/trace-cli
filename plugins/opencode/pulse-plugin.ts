@@ -49,6 +49,13 @@ export const PulsePlugin: Plugin = async (ctx) => {
                   ? info.content
                   : JSON.stringify(info.content),
             });
+          } else if (info?.role === "assistant") {
+            emitSpan("assistant_message", {
+              ...base(info.sessionID),
+              model: info.modelID,
+              tokens: info.tokens,
+              cost: info.cost,
+            });
           }
           break;
         }

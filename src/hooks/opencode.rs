@@ -21,7 +21,7 @@ impl OpenCodeHook {
     pub fn new() -> Result<Self> {
         let home = home_dir().ok_or(PulseError::HomeDirNotFound)?;
         let config_dir = home.join(OPENCODE_CONFIG_DIR);
-        let plugin_path = config_dir.join("plugins").join(OPENCODE_PLUGIN_FILENAME);
+        let plugin_path = config_dir.join("plugin").join(OPENCODE_PLUGIN_FILENAME);
         Ok(Self {
             config_dir,
             plugin_path,
@@ -146,7 +146,7 @@ mod tests {
 
     fn make_hook(tmp: &TempDir) -> OpenCodeHook {
         let config_dir = tmp.path().join(".config/opencode");
-        let plugin_path = config_dir.join("plugins").join(OPENCODE_PLUGIN_FILENAME);
+        let plugin_path = config_dir.join("plugin").join(OPENCODE_PLUGIN_FILENAME);
         OpenCodeHook {
             config_dir,
             plugin_path,

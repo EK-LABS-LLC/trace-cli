@@ -12,6 +12,7 @@ fn event_type_to_kind_mappings() {
     assert_eq!(span::event_type_to_kind("subagent_start"), "agent_run");
     assert_eq!(span::event_type_to_kind("subagent_stop"), "agent_run");
     assert_eq!(span::event_type_to_kind("user_prompt_submit"), "user_prompt");
+    assert_eq!(span::event_type_to_kind("assistant_message"), "llm_response");
     assert_eq!(span::event_type_to_kind("notification"), "notification");
     assert_eq!(span::event_type_to_kind("unknown_event"), "session");
 }
@@ -22,6 +23,7 @@ fn event_type_to_status_mappings() {
     assert_eq!(span::event_type_to_status("post_tool_use"), "success");
     assert_eq!(span::event_type_to_status("session_start"), "success");
     assert_eq!(span::event_type_to_status("stop"), "success");
+    assert_eq!(span::event_type_to_status("assistant_message"), "success");
 }
 
 #[test]
@@ -159,6 +161,56 @@ fn extract_notification() {
     let meta = fields.metadata.unwrap();
     assert_eq!(meta["message"], "Build succeeded");
     assert_eq!(meta["title"], "CI");
+}
+
+#[test]
+fn extract_assistant_message() {
+    let payload = json!({
+        "session_id": "sess_1",
+        "model": "claude-sonnet-4-20250514",
+        "tokens": {
+            "input": 100,
+            "output": 50,
+            "reasoning": 10,
+            "cache": { "read": 5, "write": 3 }
+        },
+        "cost": 0.0042
+    });
+    let fields = span::extract("assistant_message", &payload);
+    assert_eq!(fields.model.as_deref(), Some("claude-sonnet-4-20250514"));
+    let usage = &fields.metadata.as_ref().unwrap()["usage"];
+    assert_eq!(usage["input_tokens"], 100);
+    assert_eq!(usage["output_tokens"], 50);
+    assert_eq!(usage["reasoning_tokens"], 10);
+    assert_eq!(usage["cache_read_tokens"], 5);
+    assert_eq!(usage["cache_write_tokens"], 3);
+    assert_eq!(usage["cost"], 0.0042);
+}
+
+#[test]
+fn extract_assistant_message_partial_tokens() {
+    let payload = json!({
+        "session_id": "sess_1",
+        "tokens": { "input": 100, "output": 50 },
+        "cost": 0.001
+    });
+    let fields = span::extract("assistant_message", &payload);
+    let usage = &fields.metadata.as_ref().unwrap()["usage"];
+    assert_eq!(usage["input_tokens"], 100);
+    assert_eq!(usage["output_tokens"], 50);
+    assert!(usage.get("reasoning_tokens").is_none());
+    assert!(usage.get("cache_read_tokens").is_none());
+    assert!(usage.get("cache_write_tokens").is_none());
+    assert_eq!(usage["cost"], 0.001);
+}
+
+#[test]
+fn extract_assistant_message_no_tokens() {
+    let payload = json!({
+        "session_id": "sess_1"
+    });
+    let fields = span::extract("assistant_message", &payload);
+    assert!(fields.metadata.is_none());
 }
 
 #[test]

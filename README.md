@@ -4,7 +4,7 @@ CLI that hooks into AI coding agents to capture tool and session events as struc
 
 Supported agents:
 - **Claude Code** — hooks via `~/.claude/settings.json`
-- **OpenCode** — plugin via `~/.config/opencode/plugins/`
+- **OpenCode** — plugin via `~/.config/opencode/plugin/`
 
 ## Quick Start
 
@@ -66,7 +66,7 @@ SessionEnd, Stop, SubagentStart, SubagentStop,
 UserPromptSubmit, Notification
 ```
 
-**OpenCode** — installs a TypeScript plugin at `~/.config/opencode/plugins/pulse-plugin.ts` that hooks into session, message, and tool events via the OpenCode plugin API.
+**OpenCode** — installs a TypeScript plugin at `~/.config/opencode/plugin/pulse-plugin.ts` that hooks into session, message, and tool events via the OpenCode plugin API.
 
 All hooks are non-blocking — your agent never waits for Pulse.
 
@@ -126,7 +126,7 @@ Each span sent to the trace service includes:
 | `session_id` | Agent session identifier |
 | `timestamp` | ISO 8601 |
 | `source` | `claude_code` or `opencode` |
-| `kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, or `notification` |
+| `kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, `llm_response`, or `notification` |
 | `event_type` | The specific event (e.g. `post_tool_use`, `session_start`) |
 | `status` | `success` or `error` (only `post_tool_use_failure` is `error`) |
 | `tool_name` | Tool name (for tool events) |
@@ -146,7 +146,7 @@ Each span sent to the trace service includes:
 make test
 ```
 
-30 tests covering span extraction, hook install/uninstall, and serialization.
+48 tests covering span extraction, hook install/uninstall, and serialization.
 
 ### E2E Tests
 

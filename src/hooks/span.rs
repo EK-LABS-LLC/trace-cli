@@ -80,6 +80,7 @@ pub fn extract(event_type: &str, payload: &Value) -> SpanFields {
         "subagent_start" => extract_subagent(payload, &mut fields),
         "subagent_stop" => extract_subagent(payload, &mut fields),
         "user_prompt_submit" => extract_user_prompt(payload, &mut fields),
+        "assistant_message" => extract_assistant_message(payload, &mut fields),
         "notification" => extract_notification(payload, &mut fields),
         _ => {}
     }
@@ -93,6 +94,7 @@ pub fn event_type_to_kind(event_type: &str) -> &str {
         "session_start" | "session_end" | "stop" => "session",
         "subagent_start" | "subagent_stop" => "agent_run",
         "user_prompt_submit" => "user_prompt",
+        "assistant_message" => "llm_response",
         "notification" => "notification",
         _ => "session",
     }
@@ -179,6 +181,45 @@ fn extract_subagent(payload: &Value, fields: &mut SpanFields) {
 fn extract_user_prompt(payload: &Value, fields: &mut SpanFields) {
     if let Some(prompt) = str_field(payload, "prompt") {
         fields.metadata = Some(serde_json::json!({ "prompt": prompt }));
+    }
+}
+
+fn extract_assistant_message(payload: &Value, fields: &mut SpanFields) {
+    let mut usage = serde_json::Map::new();
+
+    if let Some(tokens) = payload.get("tokens") {
+        if let Some(v) = tokens.get("input").and_then(|v| v.as_u64()) {
+            usage.insert("input_tokens".to_string(), Value::Number(v.into()));
+        }
+        if let Some(v) = tokens.get("output").and_then(|v| v.as_u64()) {
+            usage.insert("output_tokens".to_string(), Value::Number(v.into()));
+        }
+        if let Some(v) = tokens.get("reasoning").and_then(|v| v.as_u64()) {
+            usage.insert("reasoning_tokens".to_string(), Value::Number(v.into()));
+        }
+        if let Some(cache) = tokens.get("cache") {
+            if let Some(v) = cache.get("read").and_then(|v| v.as_u64()) {
+                usage.insert("cache_read_tokens".to_string(), Value::Number(v.into()));
+            }
+            if let Some(v) = cache.get("write").and_then(|v| v.as_u64()) {
+                usage.insert("cache_write_tokens".to_string(), Value::Number(v.into()));
+            }
+        }
+    }
+
+    if let Some(cost) = payload.get("cost").and_then(|v| v.as_f64()) {
+        if let Some(n) = serde_json::Number::from_f64(cost) {
+            usage.insert("cost".to_string(), Value::Number(n));
+        }
+    }
+
+    if !usage.is_empty() {
+        let meta = fields
+            .metadata
+            .get_or_insert_with(|| serde_json::json!({}));
+        if let Some(obj) = meta.as_object_mut() {
+            obj.insert("usage".to_string(), Value::Object(usage));
+        }
     }
 }
 
