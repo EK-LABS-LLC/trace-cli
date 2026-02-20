@@ -7,35 +7,47 @@ Supported agents:
 - **OpenCode** — plugin via `~/.config/opencode/plugin/`
 - **OpenClaw** — hook via `~/.openclaw/hooks/`
 
-## Install
+## Getting Started
 
 Requires a running [Pulse trace service](https://github.com/EK-LABS-LLC/trace-service) and at least one supported agent installed.
+
+### 1. Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.sh | sh
 ```
 
-This auto-detects your OS and architecture, downloads the latest release binary, and installs it to `~/.local/bin/pulse`.
-
-**Options:**
+### 2. Configure
 
 ```bash
-# Install a specific version
-curl -fsSL ... | PULSE_VERSION=v0.1.0 sh
-
-# Install to a custom directory
-curl -fsSL ... | PULSE_INSTALL_DIR=/usr/local/bin sh
+pulse init
 ```
 
-## Quick Start
+You'll be prompted for your trace service URL, API key, and project ID.
+
+### 3. Connect
 
 ```bash
-pulse init        # configure trace service connection
-pulse connect     # install hooks into detected agents
-pulse status      # verify everything is wired up
+pulse connect
 ```
 
-That's it. Pulse auto-detects which agents are installed and wires them up. Every session now sends spans to your trace service.
+Pulse auto-detects your installed agents (Claude Code, OpenCode, OpenClaw) and hooks into them.
+
+### 4. Verify
+
+```bash
+pulse status
+```
+
+You're all set. Every agent session now sends traces automatically.
+
+### Uninstall
+
+```bash
+pulse disconnect
+rm ~/.local/bin/pulse
+rm -rf ~/.pulse
+```
 
 ## Commands
 
@@ -181,63 +193,6 @@ make e2e-opencode-tools    # OpenCode with tool calls
 
 # Tear down
 make e2e-down
-```
-
-### Make Targets
-
-| Target | Description |
-|--------|-------------|
-| `make build` | Debug build |
-| `make release` | Release build |
-| `make test` | Run all tests |
-| `make install` | Build release + install to `~/.local/bin` |
-| `make clean` | Clean build artifacts |
-| `make e2e` | Run all e2e test suites |
-| `make e2e-claude` | Claude Code basic e2e |
-| `make e2e-claude-tools` | Claude Code tools e2e |
-| `make e2e-opencode` | OpenCode basic e2e |
-| `make e2e-opencode-tools` | OpenCode tools e2e |
-| `make e2e-build` | Build e2e Docker images |
-| `make e2e-down` | Tear down e2e containers |
-
-## Project Structure
-
-```
-src/
-  main.rs               # CLI entrypoint
-  lib.rs                 # Library root
-  config.rs              # ~/.pulse/config.toml management
-  error.rs               # Error types
-  http.rs                # HTTP client and SpanPayload
-  commands/
-    init.rs              # pulse init
-    connect.rs           # pulse connect
-    disconnect.rs        # pulse disconnect
-    status.rs            # pulse status
-    emit.rs              # pulse emit (hot path)
-  hooks/
-    mod.rs               # ToolHook trait and HookStatus
-    claude_code.rs       # Claude Code settings.json management
-    opencode.rs          # OpenCode plugin management
-    openclaw.rs          # OpenClaw hook management
-    span.rs              # Span extraction and event type dispatch
-plugins/
-  opencode/
-    pulse-plugin.ts      # OpenCode TypeScript plugin
-  openclaw/
-    HOOK.md              # OpenClaw hook metadata
-    handler.ts           # OpenClaw TypeScript handler
-tests/
-  span_test.rs           # Span extraction tests
-  http_test.rs           # Serialization tests
-e2e/
-  docker-compose.yml     # E2E orchestration
-  Dockerfile             # Claude Code e2e image
-  Dockerfile.opencode    # OpenCode e2e image
-install.sh               # curl | sh installer
-.github/
-  workflows/
-    release.yml          # Build + release on tag push
 ```
 
 ## Releasing
