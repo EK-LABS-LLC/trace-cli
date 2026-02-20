@@ -13,6 +13,14 @@ Requires a running [Pulse trace service](https://github.com/EK-LABS-LLC/trace-se
 
 ### 1. Install
 
+Recommended (installs both `pulse-server` and `pulse`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scripts/install.sh | bash -s -- pulse-server
+```
+
+CLI-only install (if the server is already provisioned separately):
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.sh | sh
 ```
@@ -20,20 +28,17 @@ curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.
 ### 2. Configure
 
 ```bash
-pulse init
+pulse setup
 ```
 
-You'll be prompted for your trace service URL, API key, and project ID.
+This command bootstraps local setup end-to-end:
+- starts `pulse-server` if needed
+- creates/signs in your dashboard account
+- creates/uses your project API key
+- writes `~/.pulse/config.toml`
+- runs `pulse connect`
 
-### 3. Connect
-
-```bash
-pulse connect
-```
-
-Pulse auto-detects your installed agents (Claude Code, OpenCode, OpenClaw) and hooks into them.
-
-### 4. Verify
+### 3. Verify
 
 ```bash
 pulse status
@@ -53,11 +58,33 @@ rm -rf ~/.pulse
 
 | Command | Description |
 |---------|-------------|
+| `pulse setup` | Start local server (if needed), create account/project/key, save config, install hooks |
 | `pulse init` | Configure trace service connection |
 | `pulse connect` | Install hooks into all detected agents |
 | `pulse disconnect` | Remove all Pulse hooks from all agents |
 | `pulse status` | Show config, connectivity, and hook status |
 | `pulse emit <type>` | Send a span (called by hooks, not by users) |
+
+### `pulse setup`
+
+```bash
+# Interactive bootstrap (recommended)
+pulse setup
+
+# Fully non-interactive
+pulse setup \
+  --api-url http://localhost:3000 \
+  --name "Your Name" \
+  --email you@example.com \
+  --password "change-me" \
+  --project-name "My Project"
+```
+
+If your server is already running elsewhere, use:
+
+```bash
+pulse setup --api-url https://pulse.example.com --no-start-server
+```
 
 ### `pulse init`
 

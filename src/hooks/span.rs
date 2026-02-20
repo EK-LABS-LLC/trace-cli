@@ -169,9 +169,7 @@ fn extract_subagent(payload: &Value, fields: &mut SpanFields) {
         fields.agent_name = str_field(payload, "agent_name");
     }
     if let Some(id) = str_field(payload, "agent_id") {
-        let meta = fields
-            .metadata
-            .get_or_insert_with(|| serde_json::json!({}));
+        let meta = fields.metadata.get_or_insert_with(|| serde_json::json!({}));
         if let Some(obj) = meta.as_object_mut() {
             obj.insert("agent_id".to_string(), Value::String(id));
         }
@@ -214,9 +212,7 @@ fn extract_assistant_message(payload: &Value, fields: &mut SpanFields) {
     }
 
     if !usage.is_empty() {
-        let meta = fields
-            .metadata
-            .get_or_insert_with(|| serde_json::json!({}));
+        let meta = fields.metadata.get_or_insert_with(|| serde_json::json!({}));
         if let Some(obj) = meta.as_object_mut() {
             obj.insert("usage".to_string(), Value::Object(usage));
         }

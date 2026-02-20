@@ -2,6 +2,7 @@ pub mod connect;
 pub mod disconnect;
 pub mod emit;
 pub mod init;
+pub mod setup;
 pub mod status;
 
 use crate::error::Result;
@@ -11,6 +12,7 @@ pub use connect::run_connect;
 pub use disconnect::run_disconnect;
 pub use emit::{EmitArgs, run_emit};
 pub use init::{InitArgs, run_init};
+pub use setup::{SetupArgs, run_setup};
 pub use status::run_status;
 
 pub(crate) fn registered_hooks() -> Result<Vec<Box<dyn ToolHook>>> {

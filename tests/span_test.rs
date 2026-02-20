@@ -5,14 +5,23 @@ use serde_json::json;
 fn event_type_to_kind_mappings() {
     assert_eq!(span::event_type_to_kind("pre_tool_use"), "tool_use");
     assert_eq!(span::event_type_to_kind("post_tool_use"), "tool_use");
-    assert_eq!(span::event_type_to_kind("post_tool_use_failure"), "tool_use");
+    assert_eq!(
+        span::event_type_to_kind("post_tool_use_failure"),
+        "tool_use"
+    );
     assert_eq!(span::event_type_to_kind("session_start"), "session");
     assert_eq!(span::event_type_to_kind("session_end"), "session");
     assert_eq!(span::event_type_to_kind("stop"), "session");
     assert_eq!(span::event_type_to_kind("subagent_start"), "agent_run");
     assert_eq!(span::event_type_to_kind("subagent_stop"), "agent_run");
-    assert_eq!(span::event_type_to_kind("user_prompt_submit"), "user_prompt");
-    assert_eq!(span::event_type_to_kind("assistant_message"), "llm_response");
+    assert_eq!(
+        span::event_type_to_kind("user_prompt_submit"),
+        "user_prompt"
+    );
+    assert_eq!(
+        span::event_type_to_kind("assistant_message"),
+        "llm_response"
+    );
     assert_eq!(span::event_type_to_kind("notification"), "notification");
     assert_eq!(span::event_type_to_kind("unknown_event"), "session");
 }

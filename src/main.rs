@@ -2,7 +2,8 @@ use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 use pulse::commands::{
-    EmitArgs, InitArgs, run_connect, run_disconnect, run_emit, run_init, run_status,
+    EmitArgs, InitArgs, SetupArgs, run_connect, run_disconnect, run_emit, run_init, run_setup,
+    run_status,
 };
 use pulse::error::Result;
 
@@ -20,6 +21,7 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     Init(InitArgs),
+    Setup(SetupArgs),
     Connect,
     Disconnect,
     Status,
@@ -31,6 +33,7 @@ async fn main() -> ExitCode {
     let cli = Cli::parse();
     let result: Result<()> = match cli.command {
         Commands::Init(args) => run_init(args).await,
+        Commands::Setup(args) => run_setup(args).await,
         Commands::Connect => run_connect(),
         Commands::Disconnect => run_disconnect(),
         Commands::Status => run_status().await,

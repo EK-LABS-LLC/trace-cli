@@ -13,19 +13,20 @@ use crate::{
 };
 
 fn debug_enabled() -> bool {
-    std::env::var("PULSE_DEBUG").map(|v| v == "1" || v == "true").unwrap_or(false)
+    std::env::var("PULSE_DEBUG")
+        .map(|v| v == "1" || v == "true")
+        .unwrap_or(false)
 }
 
 fn debug_log(event_type: &str, payload: &Value) {
     use std::fs::OpenOptions;
     use std::io::Write;
 
-    let path = std::env::var("PULSE_DEBUG_LOG")
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .map(|h| h.join(".pulse/debug.log").to_string_lossy().to_string())
-                .unwrap_or_else(|| "/tmp/pulse-debug.log".to_string())
-        });
+    let path = std::env::var("PULSE_DEBUG_LOG").unwrap_or_else(|_| {
+        dirs::home_dir()
+            .map(|h| h.join(".pulse/debug.log").to_string_lossy().to_string())
+            .unwrap_or_else(|| "/tmp/pulse-debug.log".to_string())
+    });
 
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
         let ts = Utc::now().to_rfc3339();
@@ -85,9 +86,7 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
     let mut fields = span::extract(&event_type, &payload);
 
     // Merge cli_version, project_id, and raw event payload into metadata.
-    let meta = fields
-        .metadata
-        .get_or_insert_with(|| json!({}));
+    let meta = fields.metadata.get_or_insert_with(|| json!({}));
     if !meta.is_object() {
         *meta = json!({});
     }

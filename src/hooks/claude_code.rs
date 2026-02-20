@@ -425,7 +425,10 @@ mod tests {
         // The non-pulse hook should remain
         let post_tool = value["hooks"]["PostToolUse"].as_array().unwrap();
         assert_eq!(post_tool.len(), 1);
-        assert!(entry_contains_command(&post_tool[0], "other-tool do something"));
+        assert!(entry_contains_command(
+            &post_tool[0],
+            "other-tool do something"
+        ));
     }
 
     #[test]
