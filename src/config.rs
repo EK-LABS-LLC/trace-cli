@@ -13,6 +13,10 @@ pub struct PulseConfig {
     pub api_url: String,
     pub api_key: String,
     pub project_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_email: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_password: Option<String>,
 }
 
 impl PulseConfig {
@@ -20,6 +24,16 @@ impl PulseConfig {
         self.api_url = self.api_url.trim_end_matches('/').trim().to_string();
         self.api_key = self.api_key.trim().to_string();
         self.project_id = self.project_id.trim().to_string();
+        self.local_email = self
+            .local_email
+            .as_ref()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        self.local_password = self
+            .local_password
+            .as_ref()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
         self
     }
 }

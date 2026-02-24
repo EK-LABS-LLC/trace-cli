@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.
 ### 2. Configure
 
 ```bash
-pulse setup
+pulse setup --local
 ```
 
 This command bootstraps local setup end-to-end:
@@ -49,9 +49,10 @@ You're all set. Every agent session now sends traces automatically.
 ### Uninstall
 
 ```bash
-pulse disconnect
-rm ~/.local/bin/pulse
-rm -rf ~/.pulse
+curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scripts/uninstall.sh | bash
+
+# full cleanup (config + local data too)
+curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scripts/uninstall.sh | bash -s -- --purge-data
 ```
 
 ## Commands
@@ -59,6 +60,7 @@ rm -rf ~/.pulse
 | Command | Description |
 |---------|-------------|
 | `pulse setup` | Start local server (if needed), create account/project/key, save config, install hooks |
+| `pulse dashboard` | Open local dashboard with one-time local auto-login handoff |
 | `pulse init` | Configure trace service connection |
 | `pulse connect` | Install hooks into all detected agents |
 | `pulse disconnect` | Remove all Pulse hooks from all agents |
@@ -68,8 +70,8 @@ rm -rf ~/.pulse
 ### `pulse setup`
 
 ```bash
-# Interactive bootstrap (recommended)
-pulse setup
+# Local bootstrap (recommended for self-hosting)
+pulse setup --local
 
 # Fully non-interactive
 pulse setup \
@@ -84,6 +86,22 @@ If your server is already running elsewhere, use:
 
 ```bash
 pulse setup --api-url https://pulse.example.com --no-start-server
+```
+
+Show full API key in setup output:
+
+```bash
+pulse setup --local --show-api-key
+```
+
+### `pulse dashboard`
+
+```bash
+# Open local dashboard with auto-login (requires `pulse setup --local`)
+pulse dashboard
+
+# Print one-time login URL instead of opening browser
+pulse dashboard --no-open
 ```
 
 ### `pulse init`

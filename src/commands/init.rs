@@ -48,6 +48,8 @@ pub async fn run_init(args: InitArgs) -> Result<()> {
         api_url,
         api_key,
         project_id,
+        local_email: None,
+        local_password: None,
     }
     .sanitized();
 

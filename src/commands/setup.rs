@@ -24,6 +24,7 @@ use super::run_connect;
 const DEFAULT_API_URL: &str = "http://localhost:3000";
 const DEFAULT_SERVER_COMMAND: &str = "pulse-server";
 const DEFAULT_PROJECT_NAME: &str = "Pulse Project";
+const DEFAULT_LOCAL_ACCOUNT_NAME: &str = "Local User";
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(30);
 const HEALTH_INTERVAL: Duration = Duration::from_millis(500);
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -43,6 +44,12 @@ pub struct SetupArgs {
     /// Account password
     #[arg(long)]
     pub password: Option<String>,
+    /// Configure local mode with generated/reused local credentials
+    #[arg(long)]
+    pub local: bool,
+    /// Print the full API key in setup output
+    #[arg(long)]
+    pub show_api_key: bool,
     /// Project name (creates if missing)
     #[arg(long)]
     pub project_name: Option<String>,
@@ -101,34 +108,66 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         name,
         email,
         password,
+        local,
+        show_api_key,
         project_name,
         server_command,
         no_start_server,
         no_connect,
     } = args;
 
-    let api_url = match api_url {
-        Some(value) => value,
-        None => prompt_with_default("Trace service URL", DEFAULT_API_URL)?,
+    let existing_config = ConfigStore::load().ok();
+
+    let api_url = match (api_url, local) {
+        (Some(value), _) => value,
+        (None, true) => DEFAULT_API_URL.to_string(),
+        (None, false) => prompt_with_default("Trace service URL", DEFAULT_API_URL)?,
     };
-    let name = match name {
-        Some(value) => value,
-        None => prompt_required("Account name", false)?,
+    let base_url = normalize_base_url(&api_url)?;
+    if local && !is_local_host(&base_url) {
+        return Err(PulseError::message(format!(
+            "--local requires a loopback API URL. Got: {base_url}",
+        )));
+    }
+
+    let name = match (name, local) {
+        (Some(value), _) => value,
+        (None, true) => DEFAULT_LOCAL_ACCOUNT_NAME.to_string(),
+        (None, false) => prompt_required("Account name", false)?,
     };
-    let email = match email {
-        Some(value) => value,
-        None => prompt_required("Account email", false)?,
-    };
-    let password = match password {
-        Some(value) => value,
-        None => prompt_required("Account password", true)?,
-    };
-    let project_name = match project_name {
-        Some(value) => value,
-        None => prompt_with_default("Project name", DEFAULT_PROJECT_NAME)?,
+    let project_name = match (project_name, local) {
+        (Some(value), _) => value,
+        (None, true) => DEFAULT_PROJECT_NAME.to_string(),
+        (None, false) => prompt_with_default("Project name", DEFAULT_PROJECT_NAME)?,
     };
 
-    let base_url = normalize_base_url(&api_url)?;
+    let (email, password) = if local {
+        let persisted_pair = existing_config.as_ref().and_then(|cfg| {
+            let email = cfg.local_email.clone()?;
+            let password = cfg.local_password.clone()?;
+            Some((email, password))
+        });
+
+        let local_email = email
+            .or_else(|| persisted_pair.as_ref().map(|(value, _)| value.clone()))
+            .unwrap_or_else(generate_local_email);
+        let local_password = password
+            .or_else(|| persisted_pair.as_ref().map(|(_, value)| value.clone()))
+            .unwrap_or_else(random_secret);
+        println!("Using local setup mode with managed local credentials.");
+        (local_email, local_password)
+    } else {
+        let account_email = match email {
+            Some(value) => value,
+            None => prompt_required("Account email", false)?,
+        };
+        let account_password = match password {
+            Some(value) => value,
+            None => prompt_required("Account password", true)?,
+        };
+        (account_email, account_password)
+    };
+
     let client = Client::builder()
         .user_agent(USER_AGENT)
         .timeout(HTTP_TIMEOUT)
@@ -146,12 +185,23 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         api_url: base_url.to_string(),
         api_key,
         project_id,
+        local_email: local.then(|| email.clone()),
+        local_password: local.then(|| password.clone()),
     }
     .sanitized();
 
     ConfigStore::save(&config)?;
     let config_path = ConfigStore::config_path()?;
     println!("Saved configuration to {}", config_path.display());
+    println!("API URL: {}", config.api_url);
+    println!("Project ID: {}", config.project_id);
+    println!(
+        "API Key: {}",
+        format_api_key_for_display(&config.api_key, show_api_key)
+    );
+    if local && !show_api_key {
+        println!("Use `pulse setup --local --show-api-key` to print the full API key.");
+    }
 
     if no_connect {
         println!("Skipped agent integration setup (--no-connect).");
@@ -257,6 +307,31 @@ fn random_secret() -> String {
         "{}{}",
         Uuid::new_v4().as_simple(),
         Uuid::new_v4().as_simple()
+    )
+}
+
+fn generate_local_email() -> String {
+    let random = Uuid::new_v4().simple().to_string();
+    format!("local-{}@pulse.local", &random[..12])
+}
+
+fn format_api_key_for_display(api_key: &str, show_full: bool) -> String {
+    if show_full {
+        return api_key.to_string();
+    }
+
+    let trimmed = api_key.trim();
+    if trimmed.is_empty() {
+        return "(empty)".to_string();
+    }
+    if trimmed.len() <= 12 {
+        return "(hidden)".to_string();
+    }
+
+    format!(
+        "{}...{}",
+        &trimmed[..8],
+        &trimmed[trimmed.len().saturating_sub(4)..]
     )
 }
 
