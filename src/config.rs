@@ -17,6 +17,12 @@ pub struct PulseConfig {
     pub local_email: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub local_password: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_auth_secret: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_encryption_key: Option<String>,
 }
 
 impl PulseConfig {

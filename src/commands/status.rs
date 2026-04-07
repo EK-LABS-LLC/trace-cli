@@ -4,6 +4,7 @@ use crate::{
     error::{PulseError, Result},
     hooks::HookStatus,
     http::TraceHttpClient,
+    server,
 };
 
 pub async fn run_status() -> Result<()> {
@@ -22,6 +23,11 @@ pub async fn run_status() -> Result<()> {
     let config_path = ConfigStore::config_path()?;
     println!("  Config file : {}", config_path.display());
     println!("  API key     : {}", mask_key(&config.api_key));
+    if let Some(dir) = &config.server_dir {
+        println!("  Server dir  : {}", dir);
+    }
+
+    server::ensure_server(&config).await?;
 
     println!("\nConnectivity");
     match TraceHttpClient::new(&config) {

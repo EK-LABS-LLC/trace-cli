@@ -50,6 +50,9 @@ pub async fn run_init(args: InitArgs) -> Result<()> {
         project_id,
         local_email: None,
         local_password: None,
+        server_dir: None,
+        server_auth_secret: None,
+        server_encryption_key: None,
     }
     .sanitized();
 

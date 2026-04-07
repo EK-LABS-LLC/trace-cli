@@ -19,6 +19,8 @@ use crate::{
     error::{PulseError, Result},
 };
 
+use crate::server;
+
 use super::run_connect;
 
 const DEFAULT_API_URL: &str = "http://localhost:3000";
@@ -59,6 +61,9 @@ pub struct SetupArgs {
     /// Do not attempt to start pulse-server automatically
     #[arg(long)]
     pub no_start_server: bool,
+    /// Path to trace-service directory for auto-starting the TS server
+    #[arg(long)]
+    pub server_dir: Option<String>,
     /// Skip automatic `pulse connect` at the end
     #[arg(long)]
     pub no_connect: bool,
@@ -113,6 +118,7 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         project_name,
         server_command,
         no_start_server,
+        server_dir,
         no_connect,
     } = args;
 
@@ -168,12 +174,54 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         (account_email, account_password)
     };
 
+    // Resolve server_dir: use explicit arg, reuse existing config, or auto-detect
+    let server_dir = if let Some(dir) = server_dir {
+        Some(resolve_canonical_path(&dir))
+    } else if let Some(existing) = existing_config.as_ref().and_then(|c| c.server_dir.clone()) {
+        Some(existing)
+    } else if local {
+        auto_detect_server_dir()
+    } else {
+        None
+    };
+
+    // Persist server secrets so they survive restarts.
+    // Reuse existing ones if available, otherwise generate fresh.
+    let server_auth_secret = if local {
+        Some(
+            existing_config
+                .as_ref()
+                .and_then(|c| c.server_auth_secret.clone())
+                .unwrap_or_else(server::random_secret),
+        )
+    } else {
+        None
+    };
+    let server_encryption_key = if local {
+        Some(
+            existing_config
+                .as_ref()
+                .and_then(|c| c.server_encryption_key.clone())
+                .unwrap_or_else(server::random_secret),
+        )
+    } else {
+        None
+    };
+
     let client = Client::builder()
         .user_agent(USER_AGENT)
         .timeout(HTTP_TIMEOUT)
         .build()?;
 
-    ensure_trace_service(&client, &base_url, &server_command, no_start_server).await?;
+    ensure_trace_service(
+        &client,
+        &base_url,
+        &server_command,
+        no_start_server,
+        server_auth_secret.as_deref(),
+        server_encryption_key.as_deref(),
+    )
+    .await?;
 
     let session_cookie =
         ensure_session_cookie(&client, &base_url, &name, &email, &password, &project_name).await?;
@@ -187,6 +235,9 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         project_id,
         local_email: local.then(|| email.clone()),
         local_password: local.then(|| password.clone()),
+        server_dir,
+        server_auth_secret,
+        server_encryption_key,
     }
     .sanitized();
 
@@ -199,6 +250,9 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         "API Key: {}",
         format_api_key_for_display(&config.api_key, show_api_key)
     );
+    if let Some(dir) = &config.server_dir {
+        println!("Server dir: {}", dir);
+    }
     if local && !show_api_key {
         println!("Use `pulse setup --local --show-api-key` to print the full API key.");
     }
@@ -221,6 +275,8 @@ async fn ensure_trace_service(
     base_url: &Url,
     server_command: &str,
     no_start_server: bool,
+    auth_secret: Option<&str>,
+    encryption_key: Option<&str>,
 ) -> Result<()> {
     if is_healthy(client, base_url).await {
         println!("Trace service reachable at {}", base_url);
@@ -253,7 +309,7 @@ async fn ensure_trace_service(
         .stderr(Stdio::null())
         .stdin(Stdio::null());
 
-    let used_defaults = apply_server_env_defaults(&mut command, base_url);
+    let used_defaults = apply_server_env_defaults(&mut command, base_url, auth_secret, encryption_key);
     let child = command.spawn().map_err(|err| {
         PulseError::message(format!(
             "Failed to start `{}`: {err}",
@@ -279,15 +335,26 @@ async fn ensure_trace_service(
     )))
 }
 
-fn apply_server_env_defaults(command: &mut Command, base_url: &Url) -> bool {
+fn apply_server_env_defaults(
+    command: &mut Command,
+    base_url: &Url,
+    auth_secret: Option<&str>,
+    encryption_key: Option<&str>,
+) -> bool {
     let mut used_defaults = false;
 
     if std::env::var_os("BETTER_AUTH_SECRET").is_none() {
-        command.env("BETTER_AUTH_SECRET", random_secret());
+        let secret = auth_secret
+            .map(|s| s.to_string())
+            .unwrap_or_else(random_secret);
+        command.env("BETTER_AUTH_SECRET", secret);
         used_defaults = true;
     }
     if std::env::var_os("ENCRYPTION_KEY").is_none() {
-        command.env("ENCRYPTION_KEY", random_secret());
+        let key = encryption_key
+            .map(|s| s.to_string())
+            .unwrap_or_else(random_secret);
+        command.env("ENCRYPTION_KEY", key);
         used_defaults = true;
     }
     if std::env::var_os("BETTER_AUTH_URL").is_none() {
@@ -671,4 +738,31 @@ fn prompt_with_default(prompt: &str, default: &str) -> Result<String> {
     } else {
         Ok(value.to_string())
     }
+}
+
+fn resolve_canonical_path(path: &str) -> String {
+    match std::fs::canonicalize(path) {
+        Ok(p) => p.to_string_lossy().to_string(),
+        Err(_) => path.to_string(),
+    }
+}
+
+/// Try to find the trace-service directory relative to the CLI binary.
+fn auto_detect_server_dir() -> Option<String> {
+    // Check common sibling locations
+    let candidates = [
+        // Running from pulse/trace-cli, server at pulse/trace-service
+        "../trace-service",
+        // Running from installed location, server next to it
+        "./trace-service",
+    ];
+
+    for candidate in &candidates {
+        let path = std::path::Path::new(candidate);
+        if path.join("pulse.ts").exists() {
+            return Some(resolve_canonical_path(candidate));
+        }
+    }
+
+    None
 }

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use reqwest::{Client, Url};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
@@ -19,6 +19,57 @@ pub struct TraceHttpClient {
     base_url: Url,
     api_key: String,
     project_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SftExportQuery {
+    pub session_id: Option<String>,
+    pub source: Option<String>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub max_sessions: u32,
+    pub max_spans: u32,
+    pub max_traces: u32,
+    pub mode: String,
+    pub format: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SftMessage {
+    pub role: String,
+    pub content: String,
+    pub name: Option<String>,
+    pub tool_call_id: Option<String>,
+    pub tool_calls: Option<Vec<SftToolCall>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SftToolCall {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub call_type: String,
+    pub function: SftToolFunction,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SftToolFunction {
+    pub name: String,
+    pub arguments: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SftTrainingExample {
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+    pub messages: Vec<SftMessage>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SftExportResponse {
+    pub examples: Vec<SftTrainingExample>,
+    pub count: usize,
+    pub mode: String,
+    pub format: String,
 }
 
 impl TraceHttpClient {
@@ -67,6 +118,68 @@ impl TraceHttpClient {
             .await?
             .error_for_status()?;
         Ok(())
+    }
+
+    pub async fn export_sft_json(&self, query: &SftExportQuery) -> Result<SftExportResponse> {
+        let mut url = self.make_url("/v1/training/sft")?;
+        {
+            let mut pairs = url.query_pairs_mut();
+            if let Some(session_id) = &query.session_id {
+                pairs.append_pair("session_id", session_id);
+            }
+            if let Some(source) = &query.source {
+                pairs.append_pair("source", source);
+            }
+            if let Some(date_from) = &query.date_from {
+                pairs.append_pair("date_from", date_from);
+            }
+            if let Some(date_to) = &query.date_to {
+                pairs.append_pair("date_to", date_to);
+            }
+            pairs.append_pair("max_sessions", &query.max_sessions.to_string());
+            pairs.append_pair("max_spans", &query.max_spans.to_string());
+            pairs.append_pair("max_traces", &query.max_traces.to_string());
+            pairs.append_pair("mode", &query.mode);
+            pairs.append_pair("format", "json");
+        }
+
+        let response = self
+            .auth_headers(self.client.get(url))
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(response.json::<SftExportResponse>().await?)
+    }
+
+    pub async fn export_sft_jsonl(&self, query: &SftExportQuery) -> Result<String> {
+        let mut url = self.make_url("/v1/training/sft")?;
+        {
+            let mut pairs = url.query_pairs_mut();
+            if let Some(session_id) = &query.session_id {
+                pairs.append_pair("session_id", session_id);
+            }
+            if let Some(source) = &query.source {
+                pairs.append_pair("source", source);
+            }
+            if let Some(date_from) = &query.date_from {
+                pairs.append_pair("date_from", date_from);
+            }
+            if let Some(date_to) = &query.date_to {
+                pairs.append_pair("date_to", date_to);
+            }
+            pairs.append_pair("max_sessions", &query.max_sessions.to_string());
+            pairs.append_pair("max_spans", &query.max_spans.to_string());
+            pairs.append_pair("max_traces", &query.max_traces.to_string());
+            pairs.append_pair("mode", &query.mode);
+            pairs.append_pair("format", "jsonl");
+        }
+
+        let response = self
+            .auth_headers(self.client.get(url))
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(response.text().await?)
     }
 }
 

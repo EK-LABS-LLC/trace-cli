@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::ConfigStore;
 use crate::error::{PulseError, Result};
+use crate::server;
 
 const DEFAULT_DASHBOARD_URL: &str = "http://localhost:5173";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -40,6 +41,7 @@ struct LocalLoginTokenResponse {
 
 pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
     let config = ConfigStore::load()?;
+    server::ensure_server(&config).await?;
     let api_url = args.api_url.unwrap_or_else(|| config.api_url.clone());
     let dashboard_url = args
         .dashboard_url

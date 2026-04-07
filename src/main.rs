@@ -2,8 +2,8 @@ use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 use pulse::commands::{
-    DashboardArgs, EmitArgs, InitArgs, SetupArgs, run_connect, run_dashboard, run_disconnect,
-    run_emit, run_init, run_setup, run_status,
+    DashboardArgs, EmitArgs, ExportCommands, InitArgs, SetupArgs, run_connect, run_dashboard,
+    run_disconnect, run_emit, run_export, run_init, run_setup, run_status,
 };
 use pulse::error::Result;
 
@@ -23,6 +23,10 @@ enum Commands {
     Init(InitArgs),
     Setup(SetupArgs),
     Dashboard(DashboardArgs),
+    Export {
+        #[command(subcommand)]
+        command: ExportCommands,
+    },
     Connect,
     Disconnect,
     Status,
@@ -36,6 +40,7 @@ async fn main() -> ExitCode {
         Commands::Init(args) => run_init(args).await,
         Commands::Setup(args) => run_setup(args).await,
         Commands::Dashboard(args) => run_dashboard(args).await,
+        Commands::Export { command } => run_export(command).await,
         Commands::Connect => run_connect(),
         Commands::Disconnect => run_disconnect(),
         Commands::Status => run_status().await,
