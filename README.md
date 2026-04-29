@@ -25,6 +25,8 @@ CLI-only install (if the server is already provisioned separately):
 curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.sh | sh
 ```
 
+Re-running the installer upgrades the CLI in place and preserves your existing `~/.pulse` config.
+
 ### 2. Configure
 
 #### Local managed Pulse (recommended)
@@ -64,6 +66,22 @@ pulse status
 ```
 
 You're all set. Every agent session now sends traces automatically.
+
+### Updating
+
+Local/self-hosted Pulse:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scripts/install.sh | bash -s -- pulse-server
+```
+
+This updates `pulse-server`, dashboard assets, and the `pulse` CLI while preserving `~/.pulse` data.
+
+Remote/shared-instance CLI users:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.sh | sh
+```
 
 ### Uninstall
 
