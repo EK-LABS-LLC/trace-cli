@@ -111,9 +111,14 @@ main() {
   # quick start
   printf '  \033[1mGet started:\033[0m\n'
   echo ""
-  echo "    pulse init          # configure trace service"
-  echo "    pulse connect       # install hooks into your agents"
+  echo "    pulse connect       # connect to a remote/shared Pulse instance"
   echo "    pulse status        # verify setup"
+  echo ""
+  echo "  Or for a local managed Pulse install:"
+  echo ""
+  echo "    pulse setup --local"
+  echo "    pulse up"
+  echo "    pulse status"
   echo ""
 }
 

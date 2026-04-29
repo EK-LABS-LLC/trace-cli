@@ -5,10 +5,9 @@ use clap::Args;
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 
-use crate::config::ConfigStore;
+use crate::config::{ConfigMode, ConfigStore};
 use crate::error::{PulseError, Result};
 
-const DEFAULT_DASHBOARD_URL: &str = "http://localhost:5173";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 const USER_AGENT: &str = concat!("pulse-cli/", env!("CARGO_PKG_VERSION"));
 
@@ -43,10 +42,28 @@ pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
     let api_url = args.api_url.unwrap_or_else(|| config.api_url.clone());
     let dashboard_url = args
         .dashboard_url
-        .unwrap_or_else(|| DEFAULT_DASHBOARD_URL.to_string());
+        .unwrap_or_else(|| api_url.clone());
 
     let base_url = normalize_base_url(&api_url)?;
     let dashboard_url = normalize_base_url(&dashboard_url)?;
+    let mode = config.effective_mode();
+
+    if mode == ConfigMode::Remote {
+        if args.no_open {
+            println!("{}", dashboard_url);
+            return Ok(());
+        }
+        if let Err(err) = open_in_browser(dashboard_url.as_str()) {
+            println!("Could not open a browser automatically: {err}");
+            println!("Open this URL manually:");
+            println!("{}", dashboard_url);
+            return Ok(());
+        }
+        println!("Opened dashboard in your browser.");
+        println!("If it did not open, use:");
+        println!("{}", dashboard_url);
+        return Ok(());
+    }
 
     if !is_local_host(&base_url) {
         return Err(PulseError::message(format!(
@@ -57,6 +74,23 @@ pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
         return Err(PulseError::message(format!(
             "pulse dashboard requires a local dashboard URL. Got: {dashboard_url}"
         )));
+    }
+
+    if config.local_email.is_none() || config.local_password.is_none() {
+        if args.no_open {
+            println!("{}", dashboard_url);
+            return Ok(());
+        }
+        if let Err(err) = open_in_browser(dashboard_url.as_str()) {
+            println!("Could not open a browser automatically: {err}");
+            println!("Open this URL manually:");
+            println!("{}", dashboard_url);
+            return Ok(());
+        }
+        println!("Opened dashboard in your browser.");
+        println!("If it did not open, use:");
+        println!("{}", dashboard_url);
+        return Ok(());
     }
 
     let local_email = config.local_email.ok_or_else(|| {
@@ -163,7 +197,7 @@ fn normalize_base_url(raw: &str) -> Result<Url> {
 }
 
 fn is_local_host(url: &Url) -> bool {
-    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
+    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1" | "[::1]"))
 }
 
 fn compact_body(body: &str) -> String {

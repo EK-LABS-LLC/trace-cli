@@ -8,7 +8,7 @@ pub type Result<T, E = PulseError> = std::result::Result<T, E>;
 pub enum PulseError {
     #[error("home directory not found")]
     HomeDirNotFound,
-    #[error("Pulse is not initialized. Run `pulse init` first.")]
+    #[error("Pulse is not initialized. Run `pulse connect` or `pulse setup --local` first.")]
     ConfigMissing,
     #[error("{0}")]
     Message(String),
