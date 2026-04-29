@@ -795,6 +795,7 @@ dependencies = [
  "chrono",
  "clap",
  "dirs",
+ "libc",
  "reqwest",
  "rpassword",
  "serde",

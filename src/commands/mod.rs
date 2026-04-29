@@ -3,17 +3,19 @@ pub mod dashboard;
 pub mod disconnect;
 pub mod emit;
 pub mod init;
+pub mod local;
 pub mod setup;
 pub mod status;
 
 use crate::error::Result;
 use crate::hooks::{ClaudeCodeHook, OpenClawHook, OpenCodeHook, ToolHook};
 
-pub use connect::run_connect;
+pub use connect::{ConnectArgs, run_connect};
 pub use dashboard::{DashboardArgs, run_dashboard};
 pub use disconnect::run_disconnect;
 pub use emit::{EmitArgs, run_emit};
 pub use init::{InitArgs, run_init};
+pub use local::{LogsArgs, UpArgs, run_down, run_logs, run_restart, run_up};
 pub use setup::{SetupArgs, run_setup};
 pub use status::run_status;
 

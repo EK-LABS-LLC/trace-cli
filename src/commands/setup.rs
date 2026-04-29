@@ -15,11 +15,11 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::{
-    config::{ConfigStore, PulseConfig},
+    config::{ConfigMode, ConfigStore, PulseConfig},
     error::{PulseError, Result},
 };
 
-use super::run_connect;
+use super::connect::install_hooks;
 
 const DEFAULT_API_URL: &str = "http://localhost:3000";
 const DEFAULT_SERVER_COMMAND: &str = "pulse-server";
@@ -182,9 +182,15 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         resolve_project_and_api_key(&client, &base_url, &session_cookie, &project_name).await?;
 
     let config = PulseConfig {
+        mode: Some(if local {
+            ConfigMode::Local
+        } else {
+            ConfigMode::Remote
+        }),
         api_url: base_url.to_string(),
         api_key,
         project_id,
+        server_command: local.then(|| server_command.trim().to_string()),
         local_email: local.then(|| email.clone()),
         local_password: local.then(|| password.clone()),
     }
@@ -207,7 +213,7 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         println!("Skipped agent integration setup (--no-connect).");
     } else {
         println!("Installing agent integrations...");
-        run_connect()?;
+        install_hooks()?;
     }
 
     println!("Setup complete.");

@@ -2,8 +2,9 @@ use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 use pulse::commands::{
-    DashboardArgs, EmitArgs, InitArgs, SetupArgs, run_connect, run_dashboard, run_disconnect,
-    run_emit, run_init, run_setup, run_status,
+    ConnectArgs, DashboardArgs, EmitArgs, InitArgs, LogsArgs, SetupArgs, UpArgs, run_connect,
+    run_dashboard, run_disconnect, run_down, run_emit, run_init, run_logs, run_restart, run_setup,
+    run_status, run_up,
 };
 use pulse::error::Result;
 
@@ -23,9 +24,13 @@ enum Commands {
     Init(InitArgs),
     Setup(SetupArgs),
     Dashboard(DashboardArgs),
-    Connect,
+    Connect(ConnectArgs),
     Disconnect,
     Status,
+    Up(UpArgs),
+    Down,
+    Restart(UpArgs),
+    Logs(LogsArgs),
     Emit(EmitArgs),
 }
 
@@ -36,9 +41,13 @@ async fn main() -> ExitCode {
         Commands::Init(args) => run_init(args).await,
         Commands::Setup(args) => run_setup(args).await,
         Commands::Dashboard(args) => run_dashboard(args).await,
-        Commands::Connect => run_connect(),
+        Commands::Connect(args) => run_connect(args).await,
         Commands::Disconnect => run_disconnect(),
         Commands::Status => run_status().await,
+        Commands::Up(args) => run_up(args).await,
+        Commands::Down => run_down().await,
+        Commands::Restart(args) => run_restart(args).await,
+        Commands::Logs(args) => run_logs(args).await,
         Commands::Emit(args) => {
             run_emit(args).await;
             Ok(())
