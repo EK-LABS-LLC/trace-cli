@@ -8,6 +8,7 @@ use crate::error::{PulseError, Result};
 use super::{HookStatus, ToolHook};
 
 const CLAUDE_SETTINGS: &str = ".claude/settings.json";
+const CLAUDE_SETTINGS_LOCAL: &str = ".claude/settings.local.json";
 const CLAUDE_TOOL_NAME: &str = "Claude Code";
 pub const CLAUDE_SOURCE: &str = "claude_code";
 pub const HOOK_DEFINITIONS: &[(&str, &str)] = &[
@@ -31,8 +32,14 @@ pub struct ClaudeCodeHook {
 impl ClaudeCodeHook {
     pub fn new() -> Result<Self> {
         let home = home_dir().ok_or(PulseError::HomeDirNotFound)?;
+        let local_path = home.join(CLAUDE_SETTINGS_LOCAL);
+        let default_path = home.join(CLAUDE_SETTINGS);
         Ok(Self {
-            settings_path: home.join(CLAUDE_SETTINGS),
+            settings_path: if local_path.exists() {
+                local_path
+            } else {
+                default_path
+            },
         })
     }
 

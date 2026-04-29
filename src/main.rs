@@ -2,9 +2,9 @@ use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 use pulse::commands::{
-    ConnectArgs, DashboardArgs, EmitArgs, InitArgs, LogsArgs, SetupArgs, UpArgs, run_connect,
-    run_dashboard, run_disconnect, run_down, run_emit, run_init, run_logs, run_restart, run_setup,
-    run_status, run_up,
+    ConnectArgs, DashboardArgs, EmitArgs, InitArgs, InstallHooksArgs, LogsArgs, SetupArgs, UpArgs,
+    run_connect, run_dashboard, run_disconnect, run_down, run_emit, run_init, run_install_hooks,
+    run_logs, run_restart, run_setup, run_status, run_up,
 };
 use pulse::error::Result;
 
@@ -32,6 +32,7 @@ enum Commands {
     Restart(UpArgs),
     Logs(LogsArgs),
     Emit(EmitArgs),
+    InstallHooks(InstallHooksArgs),
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -52,6 +53,7 @@ async fn main() -> ExitCode {
             run_emit(args).await;
             Ok(())
         }
+        Commands::InstallHooks(args) => run_install_hooks(args).await,
     };
 
     match result {
