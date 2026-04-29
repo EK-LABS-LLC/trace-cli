@@ -97,7 +97,7 @@ pulse setup --local --show-api-key
 ### `pulse dashboard`
 
 ```bash
-# Open local dashboard with auto-login (requires `pulse setup --local`)
+# Open local dashboard with auto-login (served by pulse-server on the same origin)
 pulse dashboard
 
 # Print one-time login URL instead of opening browser

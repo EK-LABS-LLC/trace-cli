@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::config::ConfigStore;
 use crate::error::{PulseError, Result};
 
-const DEFAULT_DASHBOARD_URL: &str = "http://localhost:5173";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 const USER_AGENT: &str = concat!("pulse-cli/", env!("CARGO_PKG_VERSION"));
 
@@ -43,7 +42,7 @@ pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
     let api_url = args.api_url.unwrap_or_else(|| config.api_url.clone());
     let dashboard_url = args
         .dashboard_url
-        .unwrap_or_else(|| DEFAULT_DASHBOARD_URL.to_string());
+        .unwrap_or_else(|| api_url.clone());
 
     let base_url = normalize_base_url(&api_url)?;
     let dashboard_url = normalize_base_url(&dashboard_url)?;
@@ -163,7 +162,7 @@ fn normalize_base_url(raw: &str) -> Result<Url> {
 }
 
 fn is_local_host(url: &Url) -> bool {
-    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
+    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1" | "[::1]"))
 }
 
 fn compact_body(body: &str) -> String {
