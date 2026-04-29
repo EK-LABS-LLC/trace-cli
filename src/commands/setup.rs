@@ -19,7 +19,7 @@ use crate::{
     error::{PulseError, Result},
 };
 
-use super::connect::install_hooks;
+use super::install_hooks::install_hooks;
 
 const DEFAULT_API_URL: &str = "http://localhost:3000";
 const DEFAULT_SERVER_COMMAND: &str = "pulse-server";
