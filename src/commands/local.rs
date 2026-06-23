@@ -18,6 +18,9 @@ use crate::{
     error::{PulseError, Result},
 };
 
+use super::setup::ensure_local_config;
+
+const DEFAULT_API_URL: &str = "http://localhost:3000";
 const DEFAULT_SERVER_COMMAND: &str = "pulse-server";
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(30);
 const HEALTH_INTERVAL: Duration = Duration::from_millis(500);
@@ -44,7 +47,14 @@ pub struct LogsArgs {
 }
 
 pub async fn run_up(args: UpArgs) -> Result<()> {
-    let config = load_local_config()?;
+    let (config, needs_setup) = match load_local_config() {
+        Ok(config) => (config, false),
+        Err(PulseError::ConfigMissing) => {
+            println!("Pulse is not initialized. Running first-time local setup...");
+            (default_local_config(), true)
+        }
+        Err(err) => return Err(err),
+    };
     let base_url = normalize_base_url(&config.api_url)?;
     let client = http_client()?;
 
@@ -56,10 +66,19 @@ pub async fn run_up(args: UpArgs) -> Result<()> {
 
     let pid_path = ConfigStore::server_pid_path()?;
     let log_path = ConfigStore::server_log_path()?;
+    let server_command = config
+        .server_command
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(DEFAULT_SERVER_COMMAND)
+        .trim()
+        .to_string();
 
     if let Some(pid) = read_pid(&pid_path)? {
         if process_exists(pid) {
             if is_healthy(&client, &base_url).await {
+                let config =
+                    ensure_config_after_start(needs_setup, &config, &server_command).await?;
                 print_running_status(&config, pid, &log_path);
                 maybe_open_dashboard(args.open, &config.api_url)?;
                 return Ok(());
@@ -81,14 +100,6 @@ pub async fn run_up(args: UpArgs) -> Result<()> {
         .open(&log_path)?;
     let log_file_err = log_file.try_clone()?;
 
-    let server_command = config
-        .server_command
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or(DEFAULT_SERVER_COMMAND)
-        .trim()
-        .to_string();
-
     let mut command = Command::new(&server_command);
     command
         .stdin(Stdio::null())
@@ -107,13 +118,14 @@ pub async fn run_up(args: UpArgs) -> Result<()> {
 
     apply_server_env_defaults(&mut command, &base_url);
 
-    let child = command.spawn().map_err(|err| {
-        PulseError::message(format!("failed to start `{server_command}`: {err}"))
-    })?;
+    let child = command
+        .spawn()
+        .map_err(|err| PulseError::message(format!("failed to start `{server_command}`: {err}")))?;
     let pid = child.id();
     write_pid(&pid_path, pid)?;
 
     if wait_until_healthy(&client, &base_url, HEALTH_TIMEOUT, HEALTH_INTERVAL).await {
+        let config = ensure_config_after_start(needs_setup, &config, &server_command).await?;
         print_running_status(&config, pid, &log_path);
         maybe_open_dashboard(args.open, &config.api_url)?;
         return Ok(());
@@ -124,6 +136,32 @@ pub async fn run_up(args: UpArgs) -> Result<()> {
         "Pulse server did not become healthy within {}s. Check `pulse logs`.",
         HEALTH_TIMEOUT.as_secs()
     )))
+}
+
+fn default_local_config() -> PulseConfig {
+    PulseConfig {
+        mode: Some(ConfigMode::Local),
+        api_url: DEFAULT_API_URL.to_string(),
+        api_key: String::new(),
+        project_id: String::new(),
+        server_command: Some(DEFAULT_SERVER_COMMAND.to_string()),
+        local_email: None,
+        local_password: None,
+    }
+}
+
+async fn ensure_config_after_start(
+    needs_setup: bool,
+    config: &PulseConfig,
+    server_command: &str,
+) -> Result<PulseConfig> {
+    if !needs_setup {
+        return Ok(config.clone());
+    }
+
+    let config = ensure_local_config(&config.api_url, server_command, false).await?;
+    println!("Local Pulse initialized. Run `pulse install-hooks` to capture agent events.");
+    Ok(config)
 }
 
 pub async fn run_down() -> Result<()> {
@@ -238,7 +276,10 @@ fn http_client() -> Result<Client> {
 
 fn ensure_parent_dir(path: &Path) -> Result<()> {
     let parent = path.parent().ok_or_else(|| {
-        PulseError::message(format!("unable to resolve parent directory for {}", path.display()))
+        PulseError::message(format!(
+            "unable to resolve parent directory for {}",
+            path.display()
+        ))
     })?;
     fs::create_dir_all(parent)?;
     Ok(())
@@ -390,7 +431,10 @@ fn normalize_base_url(raw: &str) -> Result<Url> {
 }
 
 fn is_local_host(url: &Url) -> bool {
-    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1" | "[::1]"))
+    matches!(
+        url.host_str(),
+        Some("localhost" | "127.0.0.1" | "::1" | "[::1]")
+    )
 }
 
 async fn is_healthy(client: &Client, base_url: &Url) -> bool {

@@ -222,6 +222,86 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
     Ok(())
 }
 
+pub async fn ensure_local_config(
+    api_url: &str,
+    server_command: &str,
+    install_integrations: bool,
+) -> Result<PulseConfig> {
+    println!("Initializing local Pulse configuration...");
+
+    let existing_config = ConfigStore::load().ok();
+    let base_url = normalize_base_url(api_url)?;
+    if !is_local_host(&base_url) {
+        return Err(PulseError::message(format!(
+            "local setup requires a loopback API URL. Got: {base_url}",
+        )));
+    }
+
+    let persisted_pair = existing_config.as_ref().and_then(|cfg| {
+        let email = cfg.local_email.clone()?;
+        let password = cfg.local_password.clone()?;
+        Some((email, password))
+    });
+
+    let email = persisted_pair
+        .as_ref()
+        .map(|(value, _)| value.clone())
+        .unwrap_or_else(generate_local_email);
+    let password = persisted_pair
+        .as_ref()
+        .map(|(_, value)| value.clone())
+        .unwrap_or_else(random_secret);
+
+    let client = Client::builder()
+        .user_agent(USER_AGENT)
+        .timeout(HTTP_TIMEOUT)
+        .build()?;
+
+    if !is_healthy(&client, &base_url).await {
+        return Err(PulseError::message(format!(
+            "Trace service is not reachable at {base_url}. Start it with `pulse up` and retry.",
+        )));
+    }
+
+    let session_cookie = ensure_session_cookie(
+        &client,
+        &base_url,
+        DEFAULT_LOCAL_ACCOUNT_NAME,
+        &email,
+        &password,
+        DEFAULT_PROJECT_NAME,
+    )
+    .await?;
+
+    let (project_id, api_key) =
+        resolve_project_and_api_key(&client, &base_url, &session_cookie, DEFAULT_PROJECT_NAME)
+            .await?;
+
+    let config = PulseConfig {
+        mode: Some(ConfigMode::Local),
+        api_url: base_url.to_string(),
+        api_key,
+        project_id,
+        server_command: Some(server_command.trim().to_string()),
+        local_email: Some(email),
+        local_password: Some(password),
+    }
+    .sanitized();
+
+    ConfigStore::save(&config)?;
+    println!(
+        "Saved local Pulse configuration to {}.",
+        ConfigStore::config_path()?.display()
+    );
+
+    if install_integrations {
+        println!("Installing agent integrations...");
+        install_hooks()?;
+    }
+
+    Ok(config)
+}
+
 async fn ensure_trace_service(
     client: &Client,
     base_url: &Url,
