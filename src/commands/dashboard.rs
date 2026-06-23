@@ -26,8 +26,8 @@ pub struct DashboardArgs {
 
 #[derive(Debug, Serialize)]
 struct LocalLoginTokenRequest<'a> {
-    email: &'a str,
-    password: &'a str,
+    api_key: &'a str,
+    project_id: &'a str,
     redirect_url: &'a str,
 }
 
@@ -40,9 +40,7 @@ struct LocalLoginTokenResponse {
 pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
     let config = ConfigStore::load()?;
     let api_url = args.api_url.unwrap_or_else(|| config.api_url.clone());
-    let dashboard_url = args
-        .dashboard_url
-        .unwrap_or_else(|| api_url.clone());
+    let dashboard_url = args.dashboard_url.unwrap_or_else(|| api_url.clone());
 
     let base_url = normalize_base_url(&api_url)?;
     let dashboard_url = normalize_base_url(&dashboard_url)?;
@@ -76,34 +74,6 @@ pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
         )));
     }
 
-    if config.local_email.is_none() || config.local_password.is_none() {
-        if args.no_open {
-            println!("{}", dashboard_url);
-            return Ok(());
-        }
-        if let Err(err) = open_in_browser(dashboard_url.as_str()) {
-            println!("Could not open a browser automatically: {err}");
-            println!("Open this URL manually:");
-            println!("{}", dashboard_url);
-            return Ok(());
-        }
-        println!("Opened dashboard in your browser.");
-        println!("If it did not open, use:");
-        println!("{}", dashboard_url);
-        return Ok(());
-    }
-
-    let local_email = config.local_email.ok_or_else(|| {
-        PulseError::message(
-            "Local dashboard auto-login is not configured. Run `pulse setup --local` first.",
-        )
-    })?;
-    let local_password = config.local_password.ok_or_else(|| {
-        PulseError::message(
-            "Local dashboard auto-login is not configured. Run `pulse setup --local` first.",
-        )
-    })?;
-
     let client = Client::builder()
         .user_agent(USER_AGENT)
         .timeout(HTTP_TIMEOUT)
@@ -114,8 +84,8 @@ pub async fn run_dashboard(args: DashboardArgs) -> Result<()> {
 
     let token_url = make_url(&base_url, "/dashboard/api/local-login-token")?;
     let payload = LocalLoginTokenRequest {
-        email: local_email.trim(),
-        password: local_password.trim(),
+        api_key: config.api_key.trim(),
+        project_id: config.project_id.trim(),
         redirect_url: dashboard_url.as_str(),
     };
 
@@ -197,7 +167,10 @@ fn normalize_base_url(raw: &str) -> Result<Url> {
 }
 
 fn is_local_host(url: &Url) -> bool {
-    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1" | "[::1]"))
+    matches!(
+        url.host_str(),
+        Some("localhost" | "127.0.0.1" | "::1" | "[::1]")
+    )
 }
 
 fn compact_body(body: &str) -> String {

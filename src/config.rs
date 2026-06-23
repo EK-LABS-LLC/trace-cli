@@ -65,8 +65,7 @@ impl PulseConfig {
 }
 
 fn infer_mode(config: &PulseConfig) -> ConfigMode {
-    let has_local_creds = config.local_email.is_some() && config.local_password.is_some();
-    if has_local_creds && is_loopback_api_url(&config.api_url) {
+    if is_loopback_api_url(&config.api_url) {
         ConfigMode::Local
     } else {
         ConfigMode::Remote
@@ -151,17 +150,15 @@ mod tests {
     }
 
     #[test]
-    fn infers_local_mode_when_local_credentials_exist() {
-        let mut config = base_config();
-        config.local_email = Some("local@pulse.test".to_string());
-        config.local_password = Some("secret".to_string());
-
+    fn infers_local_mode_when_api_url_is_loopback() {
+        let config = base_config();
         assert_eq!(config.effective_mode(), ConfigMode::Local);
     }
 
     #[test]
-    fn infers_remote_mode_without_local_credentials() {
-        let config = base_config();
+    fn infers_remote_mode_for_non_loopback_api_url() {
+        let mut config = base_config();
+        config.api_url = "https://pulse.example.com".to_string();
         assert_eq!(config.effective_mode(), ConfigMode::Remote);
     }
 
