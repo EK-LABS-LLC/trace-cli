@@ -116,8 +116,8 @@ main() {
   echo ""
   echo "  Or for a local managed Pulse install:"
   echo ""
-  echo "    pulse setup --local"
   echo "    pulse up"
+  echo "    pulse dashboard"
   echo "    pulse status"
   echo ""
 }
