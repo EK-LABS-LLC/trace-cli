@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Make Auth Simpler - Final Local Smoke And Tests
+
+Date: 2026-06-23 15:44:20 CDT; Status: Completed; PR: #4 https://github.com/EK-LABS-LLC/trace-cli/pull/4
+Task: Finish auth simplification verification and lock no-credential config behavior.
+Message: Fresh local bootstrap, dashboard auto-login, API ingest/readback, and SDK connectivity were smoke-tested against local trace-service.
+Added/Changed: Added config serialization test proving missing local credentials are omitted from saved TOML.
+Fixed/Removed: No new local configs store `local_email` or `local_password`; docs already point users to `pulse up` then `pulse dashboard`.
+Handoff: Paired trace-service PR #7; provider SDK calls skipped because no real OpenAI/Anthropic keys were configured.
+
 ### Make Auth Simpler - Stop Storing Local Credentials
 
 Date: 2026-06-23 15:44:20 CDT; Status: Completed; PR: #4 https://github.com/EK-LABS-LLC/trace-cli/pull/4

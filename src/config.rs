@@ -173,4 +173,13 @@ mod tests {
         assert_eq!(sanitized.local_email.as_deref(), Some("local@pulse.test"));
         assert_eq!(sanitized.local_password.as_deref(), Some("secret"));
     }
+
+    #[test]
+    fn serialization_omits_missing_local_credentials() {
+        let config = base_config().sanitized();
+        let body = toml::to_string_pretty(&config).expect("config should serialize");
+
+        assert!(!body.contains("local_email"));
+        assert!(!body.contains("local_password"));
+    }
 }
