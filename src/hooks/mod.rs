@@ -1,9 +1,11 @@
 mod claude_code;
+mod codex;
 mod openclaw;
 mod opencode;
 pub mod span;
 
 pub use claude_code::{CLAUDE_SOURCE, ClaudeCodeHook};
+pub use codex::{CODEX_SOURCE, CodexHook};
 pub use openclaw::OpenClawHook;
 pub use opencode::OpenCodeHook;
 

@@ -38,3 +38,23 @@ services:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  e2e-codex:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.codex
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  e2e-codex-tools:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.codex
+      args:
+        TEST_SCRIPT: codex-tools-e2e.sh
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

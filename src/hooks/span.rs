@@ -71,7 +71,7 @@ pub fn extract(event_type: &str, payload: &Value) -> SpanFields {
     let mut fields = extract_common(payload);
 
     match event_type {
-        "pre_tool_use" => extract_pre_tool_use(payload, &mut fields),
+        "pre_tool_use" | "permission_request" => extract_pre_tool_use(payload, &mut fields),
         "post_tool_use" => extract_post_tool_use(payload, &mut fields),
         "post_tool_use_failure" => extract_post_tool_use_failure(payload, &mut fields),
         "session_start" => extract_session_start(payload, &mut fields),
@@ -91,6 +91,7 @@ pub fn extract(event_type: &str, payload: &Value) -> SpanFields {
 pub fn event_type_to_kind(event_type: &str) -> &str {
     match event_type {
         "pre_tool_use" | "post_tool_use" | "post_tool_use_failure" => "tool_use",
+        "permission_request" => "tool_use",
         "session_start" | "session_end" | "stop" => "session",
         "subagent_start" | "subagent_stop" => "agent_run",
         "user_prompt_submit" => "user_prompt",

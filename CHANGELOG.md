@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Add Codex Hook Support
+
+Date: 2026-06-23 16:51:17 CDT; Status: Completed; PR: TBD
+Task: Add Codex as a first-class Pulse hook integration.
+Message: `pulse install-hooks` now writes Codex lifecycle hooks and a hidden `emit-codex` adapter labels Codex spans correctly.
+Added/Changed: Codex status/connect/disconnect support, `permission_request` span mapping, and README hook docs.
+
 ### Fix Claude Hook Install Location
 
 Date: 2026-06-23 16:59:58 CDT; Status: Completed; PR: TBD

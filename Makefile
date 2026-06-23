@@ -1,6 +1,7 @@
 .PHONY: build test clean install \
        e2e e2e-build e2e-down \
-       e2e-claude e2e-claude-tools e2e-opencode e2e-opencode-tools
+       e2e-claude e2e-claude-tools e2e-opencode e2e-opencode-tools \
+       e2e-codex e2e-codex-tools
 
 # ── Local ──────────────────────────────────────────────────────────
 
@@ -41,6 +42,12 @@ e2e-opencode:
 e2e-opencode-tools:
 	$(DC) up --build --abort-on-container-exit e2e-oc-tools
 
+e2e-codex:
+	$(DC) up --build --abort-on-container-exit e2e-codex
+
+e2e-codex-tools:
+	$(DC) up --build --abort-on-container-exit e2e-codex-tools
+
 # ── E2E (run all suites sequentially) ─────────────────────────────
 
-e2e: e2e-claude e2e-claude-tools e2e-opencode e2e-opencode-tools
+e2e: e2e-claude e2e-claude-tools e2e-opencode e2e-opencode-tools e2e-codex e2e-codex-tools
