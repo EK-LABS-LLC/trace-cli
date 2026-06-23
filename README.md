@@ -32,19 +32,21 @@ Re-running the installer upgrades the CLI in place and preserves your existing `
 #### Local managed Pulse (recommended)
 
 ```bash
-pulse setup --local
 pulse up
+pulse dashboard
 ```
 
-First-time setup:
-- starts `pulse-server` if needed for bootstrap
-- creates/signs in your dashboard account
-- creates/uses your project API key
+On first run, `pulse up`:
+- starts `pulse-server`
+- creates/reuses a local dashboard account
+- creates/reuses your project API key
 - writes `~/.pulse/config.toml`
-- installs hooks
+
+Then `pulse dashboard` opens the local dashboard with a one-time local login URL.
 
 Daily use:
 - run `pulse up` to start `pulse-server` in the background
+- run `pulse dashboard` to open the local dashboard
 - run `pulse logs --follow` to watch server logs
 - run `pulse down` to stop it
 
@@ -96,7 +98,7 @@ curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scri
 
 | Command | Description |
 |---------|-------------|
-| `pulse setup` | Bootstrap a local or remote Pulse account/project and save config |
+| `pulse setup` | Manually bootstrap a local or remote Pulse account/project and save config |
 | `pulse up` | Start the managed local Pulse server in the background |
 | `pulse down` | Stop the managed local Pulse server |
 | `pulse restart` | Restart the managed local Pulse server |
@@ -111,7 +113,7 @@ curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scri
 ### `pulse setup`
 
 ```bash
-# Local bootstrap (recommended for self-hosting)
+# Manual local bootstrap
 pulse setup --local
 
 # Fully non-interactive
@@ -136,7 +138,7 @@ Show full API key in setup output:
 pulse setup --local --show-api-key
 ```
 
-After local setup, start the local server for normal use with:
+For normal local use, `pulse up` can perform first-time bootstrap automatically:
 
 ```bash
 pulse up
@@ -151,8 +153,9 @@ pulse up
 pulse up --open
 ```
 
-Starts `pulse-server` in the background, waits for `/health`, and prints the
-dashboard URL, PID, and log path.
+Starts `pulse-server` in the background, waits for `/health`, performs first-time
+local bootstrap if config is missing, and prints the dashboard URL, PID, and log
+path.
 
 ### `pulse down`
 

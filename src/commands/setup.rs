@@ -44,7 +44,7 @@ pub struct SetupArgs {
     /// Account password
     #[arg(long)]
     pub password: Option<String>,
-    /// Configure local mode with generated/reused local credentials
+    /// Configure local mode with generated local bootstrap credentials
     #[arg(long)]
     pub local: bool,
     /// Print the full API key in setup output
@@ -154,7 +154,7 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         let local_password = password
             .or_else(|| persisted_pair.as_ref().map(|(_, value)| value.clone()))
             .unwrap_or_else(random_secret);
-        println!("Using local setup mode with managed local credentials.");
+        println!("Using local setup mode with managed bootstrap credentials.");
         (local_email, local_password)
     } else {
         let account_email = match email {
@@ -191,8 +191,8 @@ pub async fn run_setup(args: SetupArgs) -> Result<()> {
         api_key,
         project_id,
         server_command: local.then(|| server_command.trim().to_string()),
-        local_email: local.then(|| email.clone()),
-        local_password: local.then(|| password.clone()),
+        local_email: None,
+        local_password: None,
     }
     .sanitized();
 
@@ -283,8 +283,8 @@ pub async fn ensure_local_config(
         api_key,
         project_id,
         server_command: Some(server_command.trim().to_string()),
-        local_email: Some(email),
-        local_password: Some(password),
+        local_email: None,
+        local_password: None,
     }
     .sanitized();
 

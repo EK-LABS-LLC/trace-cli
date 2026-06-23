@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Make Auth Simpler - Stop Storing Local Credentials
+
+Date: 2026-06-23 15:44:20 CDT; Status: Completed; PR: #4 https://github.com/EK-LABS-LLC/trace-cli/pull/4
+Task: Stop writing local dashboard email/password fields into new local configs.
+Message: Local bootstrap still creates/reuses the account internally, but saved config now only needs API URL, API key, project id, and server command.
+Added/Changed: README now documents `pulse up` then `pulse dashboard` as the normal local flow.
+Fixed/Removed: New local configs no longer persist `local_email` or `local_password`; old configs remain readable.
+Handoff: Pair with trace-service PR #7 API-key local login; verify full local smoke after both PRs are reviewed.
+
 ### Make Auth Simpler - API-Key Local Dashboard Login
 
 Date: 2026-06-23 15:28:20 CDT; Status: Completed; PR: #4 https://github.com/EK-LABS-LLC/trace-cli/pull/4
