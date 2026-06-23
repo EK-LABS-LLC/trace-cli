@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fix CLI Release Version And Installer Start Text
+
+Date: 2026-06-23 16:34:27 CDT; Status: Completed; PR: TBD
+Task: Fix post-release CLI metadata and install guidance.
+Message: `pulse --version` now matches the next release, and installer output points local users to `pulse up` then `pulse dashboard`.
+Changed/Fixed: Bumped Cargo package version to 0.2.11 and removed stale `pulse setup --local` from install quick start.
+
 ### Make Auth Simpler - Final Local Smoke And Tests
 
 Date: 2026-06-23 15:44:20 CDT; Status: Completed; PR: #4 https://github.com/EK-LABS-LLC/trace-cli/pull/4
