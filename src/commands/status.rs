@@ -11,7 +11,9 @@ pub async fn run_status() -> Result<()> {
     let config = match ConfigStore::load() {
         Ok(cfg) => cfg,
         Err(PulseError::ConfigMissing) => {
-            println!("Pulse is not initialized. Run `pulse connect` or `pulse setup --local` first.");
+            println!(
+                "Pulse is not initialized. Run `pulse connect` or `pulse setup --local` first."
+            );
             return Ok(());
         }
         Err(err) => return Err(err),
@@ -118,7 +120,7 @@ fn print_hook_status(status: &HookStatus) {
             println!("    {}", status.installed_hook_names.join(", "));
         }
         if !status.connected && status.installed_hooks < status.total_hooks {
-            println!("    Run `pulse connect` to install missing hooks");
+            println!("    Run `pulse install-hooks` to install missing hooks");
         }
     }
 }

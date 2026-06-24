@@ -85,19 +85,19 @@ pulse init \
   --project-id "e2e-opencode" \
   --no-validate
 
-# ── Step 2: Connect hooks ────────────────────────────────────────
-echo "── Step 2: pulse connect"
+# ── Step 2: Install hooks ────────────────────────────────────────
+echo "── Step 2: pulse install-hooks"
 
 # Create OpenCode config dir so connect can detect it
 mkdir -p ~/.config/opencode
 
-CONNECT_OUTPUT=$(pulse connect 2>&1)
+CONNECT_OUTPUT=$(pulse install-hooks 2>&1)
 echo "$CONNECT_OUTPUT"
 
-assert_eq "connect mentions OpenCode" "true" \
+assert_eq "install-hooks mentions OpenCode" "true" \
   "$(echo "$CONNECT_OUTPUT" | grep -q 'OpenCode' && echo true || echo false)"
 
-assert_eq "connect shows 1/1 hooks" "true" \
+assert_eq "install-hooks shows 1/1 hooks" "true" \
   "$(echo "$CONNECT_OUTPUT" | grep -q '1/1' && echo true || echo false)"
 
 # Verify plugin file was installed
@@ -135,7 +135,8 @@ ALL_SPANS=$(extract_spans "$RESPONSE")
 
 # Filter to only spans from this test run (after BEFORE_TS, source=opencode)
 SESSION_SPANS=$(echo "$ALL_SPANS" | jq --arg ts "$BEFORE_TS" \
-  'map(select(.timestamp >= $ts and .source == "opencode"))')
+  'def epoch: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+   map(select((.timestamp | epoch) >= ($ts | epoch) and .source == "opencode"))')
 SESSION_COUNT=$(echo "$SESSION_SPANS" | jq 'length')
 
 echo "  Total spans in DB: $(echo "$ALL_SPANS" | jq 'length')"

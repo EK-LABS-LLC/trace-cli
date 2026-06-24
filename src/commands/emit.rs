@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::{
     config::ConfigStore,
     error::Result,
-    hooks::{CLAUDE_SOURCE, span},
+    hooks::{CLAUDE_SOURCE, CODEX_SOURCE, span},
     http::TraceHttpClient,
 };
 
@@ -49,7 +49,7 @@ pub async fn run_emit(args: EmitArgs) {
 
 fn normalized_source(source: Option<String>) -> String {
     match source.as_deref() {
-        Some("claude_code" | "opencode" | "openclaw") => source.unwrap(),
+        Some(CLAUDE_SOURCE | CODEX_SOURCE | "opencode" | "openclaw") => source.unwrap(),
         _ => CLAUDE_SOURCE.to_string(),
     }
 }
@@ -59,11 +59,6 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
     if event_type.is_empty() {
         return Ok(());
     }
-
-    let config = match ConfigStore::load() {
-        Ok(cfg) => cfg,
-        Err(_) => return Ok(()),
-    };
 
     let mut stdin = String::new();
     if io::stdin().read_to_string(&mut stdin).is_err() {
@@ -79,11 +74,30 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
         Err(_) => return Ok(()),
     };
 
+    emit_payload(&event_type, payload, None).await
+}
+
+pub async fn emit_payload(
+    event_type: &str,
+    mut payload: Value,
+    source_override: Option<&str>,
+) -> Result<()> {
+    let config = match ConfigStore::load() {
+        Ok(cfg) => cfg,
+        Err(_) => return Ok(()),
+    };
+
     if debug_enabled() {
-        debug_log(&event_type, &payload);
+        debug_log(event_type, &payload);
     }
 
-    let mut fields = span::extract(&event_type, &payload);
+    if let Some(source) = source_override {
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert("source".to_string(), Value::String(source.to_string()));
+        }
+    }
+
+    let mut fields = span::extract(event_type, &payload);
 
     // Merge cli_version, project_id, and raw event payload into metadata.
     let meta = fields.metadata.get_or_insert_with(|| json!({}));
@@ -107,7 +121,7 @@ async fn emit_inner(args: EmitArgs) -> Result<()> {
     let span = match fields.into_span(
         Uuid::new_v4().to_string(),
         Utc::now().to_rfc3339(),
-        event_type,
+        event_type.to_string(),
         source.clone(),
     ) {
         Some(s) => s,

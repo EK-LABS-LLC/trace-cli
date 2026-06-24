@@ -4,6 +4,7 @@ CLI that hooks into AI coding agents to capture tool and session events as struc
 
 Supported agents:
 - **Claude Code** — hooks via `~/.claude/settings.json`
+- **Codex** — hooks via `~/.codex/hooks.json`
 - **OpenCode** — plugin via `~/.config/opencode/plugin/`
 - **OpenClaw** — hook via `~/.openclaw/hooks/`
 
@@ -230,6 +231,7 @@ This:
 Hook installation covers:
 
 - **Claude Code** — installs 10 async hooks into `~/.claude/settings.json` (PreToolUse, PostToolUse, PostToolUseFailure, SessionStart, SessionEnd, Stop, SubagentStart, SubagentStop, UserPromptSubmit, Notification)
+- **Codex** — installs 8 lifecycle hooks into `~/.codex/hooks.json` (SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStart, SubagentStop, Stop). Run `/hooks` in Codex to review and trust new hooks.
 - **OpenCode** — installs a TypeScript plugin at `~/.config/opencode/plugin/pulse-plugin.ts` that hooks into session, message, and tool events
 - **OpenClaw** — installs a hook at `~/.openclaw/hooks/pulse-hook/` that hooks into command and message events
 
@@ -258,6 +260,7 @@ When an agent fires an event (tool call, session start, etc.), it pipes JSON to 
 4. POSTs it to the trace service at `/v1/spans/async`
 
 **Claude Code** calls `pulse emit` directly from its hook system.
+**Codex** calls `pulse emit-codex` from its lifecycle hooks, which normalizes Codex hook payloads into Pulse spans.
 **OpenCode** runs a plugin that calls `Bun.spawn(["pulse", "emit", ...])`.
 **OpenClaw** runs a handler that calls `child_process.spawn("pulse", ["emit", ...])`.
 
@@ -283,7 +286,7 @@ Each span sent to the trace service includes:
 | `span_id` | UUID v4 |
 | `session_id` | Agent session identifier |
 | `timestamp` | ISO 8601 |
-| `source` | `claude_code`, `opencode`, or `openclaw` |
+| `source` | `claude_code`, `codex`, `opencode`, or `openclaw` |
 | `kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, `llm_response`, or `notification` |
 | `event_type` | The specific event (e.g. `post_tool_use`, `session_start`) |
 | `status` | `success` or `error` |
@@ -331,7 +334,7 @@ E2E tests run each agent in a container, fire real hooks, and validate spans lan
 ```bash
 # 1. Set up environment
 cp e2e/.env.example e2e/.env
-# Fill in ANTHROPIC_API_KEY, PULSE_API_URL, PULSE_API_KEY
+# Fill in ANTHROPIC_API_KEY, OPENAI_API_KEY, PULSE_API_URL, PULSE_API_KEY
 
 # 2. Run all suites
 make e2e
@@ -341,6 +344,8 @@ make e2e-claude            # Claude Code basic session
 make e2e-claude-tools      # Claude Code with tool calls + subagents
 make e2e-opencode          # OpenCode basic session
 make e2e-opencode-tools    # OpenCode with tool calls
+make e2e-codex             # Codex basic session
+make e2e-codex-tools       # Codex with tool calls
 
 # Tear down
 make e2e-down

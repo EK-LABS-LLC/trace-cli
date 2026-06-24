@@ -2,9 +2,10 @@ use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 use pulse::commands::{
-    ConnectArgs, DashboardArgs, EmitArgs, InitArgs, InstallHooksArgs, LogsArgs, SetupArgs, UpArgs,
-    run_connect, run_dashboard, run_disconnect, run_down, run_emit, run_init, run_install_hooks,
-    run_logs, run_restart, run_setup, run_status, run_up,
+    ConnectArgs, DashboardArgs, EmitArgs, EmitCodexArgs, InitArgs, InstallHooksArgs, LogsArgs,
+    SetupArgs, UpArgs, run_connect, run_dashboard, run_disconnect, run_down, run_emit,
+    run_emit_codex, run_init, run_install_hooks, run_logs, run_restart, run_setup, run_status,
+    run_up,
 };
 use pulse::error::Result;
 
@@ -32,6 +33,8 @@ enum Commands {
     Restart(UpArgs),
     Logs(LogsArgs),
     Emit(EmitArgs),
+    #[command(hide = true)]
+    EmitCodex(EmitCodexArgs),
     InstallHooks(InstallHooksArgs),
 }
 
@@ -51,6 +54,10 @@ async fn main() -> ExitCode {
         Commands::Logs(args) => run_logs(args).await,
         Commands::Emit(args) => {
             run_emit(args).await;
+            Ok(())
+        }
+        Commands::EmitCodex(args) => {
+            run_emit_codex(args).await;
             Ok(())
         }
         Commands::InstallHooks(args) => run_install_hooks(args).await,

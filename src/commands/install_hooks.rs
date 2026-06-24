@@ -1,11 +1,6 @@
 use clap::Args;
 
-use crate::{
-    commands::registered_hooks,
-    config::ConfigStore,
-    error::Result,
-    hooks::HookStatus,
-};
+use crate::{commands::registered_hooks, config::ConfigStore, error::Result, hooks::HookStatus};
 
 #[derive(Debug, Args)]
 pub struct InstallHooksArgs {}
@@ -13,16 +8,14 @@ pub struct InstallHooksArgs {}
 pub async fn run_install_hooks(_args: InstallHooksArgs) -> Result<()> {
     let config = match ConfigStore::load() {
         Ok(cfg) => cfg,
-        Err(e) => {
-            match e {
-                crate::error::PulseError::ConfigMissing => {
-                    println!("No Pulse configuration found.");
-                    println!("Please run `pulse connect` to set up your connection first.");
-                    return Ok(());
-                }
-                other => return Err(other.into()),
+        Err(e) => match e {
+            crate::error::PulseError::ConfigMissing => {
+                println!("No Pulse configuration found.");
+                println!("Please run `pulse connect` to set up your connection first.");
+                return Ok(());
             }
-        }
+            other => return Err(other.into()),
+        },
     };
 
     if config.api_url.is_empty() || config.api_key.is_empty() || config.project_id.is_empty() {
@@ -55,7 +48,7 @@ pub fn install_hooks() -> Result<()> {
         Ok(())
     } else {
         println!(
-            "\nNo supported tools detected. Launch Claude Code at least once so we can locate its settings."
+            "\nNo supported tools detected. Launch Claude Code, Codex, OpenCode, or OpenClaw at least once so Pulse can locate its settings."
         );
         Ok(())
     }

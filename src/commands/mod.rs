@@ -2,6 +2,7 @@ pub mod connect;
 pub mod dashboard;
 pub mod disconnect;
 pub mod emit;
+pub mod emit_codex;
 pub mod init;
 pub mod install_hooks;
 pub mod local;
@@ -9,12 +10,13 @@ pub mod setup;
 pub mod status;
 
 use crate::error::Result;
-use crate::hooks::{ClaudeCodeHook, OpenClawHook, OpenCodeHook, ToolHook};
+use crate::hooks::{ClaudeCodeHook, CodexHook, OpenClawHook, OpenCodeHook, ToolHook};
 
 pub use connect::{ConnectArgs, run_connect};
 pub use dashboard::{DashboardArgs, run_dashboard};
 pub use disconnect::run_disconnect;
 pub use emit::{EmitArgs, run_emit};
+pub use emit_codex::{EmitCodexArgs, run_emit_codex};
 pub use init::{InitArgs, run_init};
 pub use install_hooks::{InstallHooksArgs, run_install_hooks};
 pub use local::{LogsArgs, UpArgs, run_down, run_logs, run_restart, run_up};
@@ -24,6 +26,7 @@ pub use status::run_status;
 pub(crate) fn registered_hooks() -> Result<Vec<Box<dyn ToolHook>>> {
     let mut hooks: Vec<Box<dyn ToolHook>> = Vec::new();
     hooks.push(Box::new(ClaudeCodeHook::new()?));
+    hooks.push(Box::new(CodexHook::new()?));
     hooks.push(Box::new(OpenCodeHook::new()?));
     hooks.push(Box::new(OpenClawHook::new()?));
     Ok(hooks)

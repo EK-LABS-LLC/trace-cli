@@ -63,7 +63,7 @@ export PULSE_DEBUG=1
 export PULSE_DEBUG_LOG=/tmp/pulse-debug.log
 
 # ── Setup ─────────────────────────────────────────────────────────
-echo "── Setup: pulse init + connect"
+echo "── Setup: pulse init + install-hooks"
 pulse init \
   --api-url "$PULSE_API_URL" \
   --api-key "$PULSE_API_KEY" \
@@ -72,7 +72,7 @@ pulse init \
 
 mkdir -p ~/.claude
 echo '{}' > ~/.claude/settings.json
-pulse connect
+pulse install-hooks
 
 # Create a test file for Claude to read
 mkdir -p /workdir
@@ -107,7 +107,8 @@ RESPONSE=$(query_spans "limit=200")
 ALL_SPANS=$(extract_spans "$RESPONSE")
 
 SESSION_SPANS=$(echo "$ALL_SPANS" | jq --arg ts "$BEFORE_TS" \
-  'map(select(.timestamp >= $ts and .source == "claude_code"))')
+  'def epoch: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+   map(select((.timestamp | epoch) >= ($ts | epoch) and .source == "claude_code"))')
 SESSION_COUNT=$(echo "$SESSION_SPANS" | jq 'length')
 
 echo "  Spans from this session: $SESSION_COUNT"
