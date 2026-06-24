@@ -379,10 +379,10 @@ fn apply_server_env_defaults(command: &mut Command, base_url: &Url) -> bool {
     if std::env::var_os("BETTER_AUTH_URL").is_none() {
         command.env("BETTER_AUTH_URL", base_url.origin().ascii_serialization());
     }
-    if std::env::var_os("PORT").is_none()
-        && let Some(port) = base_url.port_or_known_default()
-    {
-        command.env("PORT", port.to_string());
+    if std::env::var_os("PORT").is_none() {
+        if let Some(port) = base_url.port_or_known_default() {
+            command.env("PORT", port.to_string());
+        }
     }
 
     used_defaults

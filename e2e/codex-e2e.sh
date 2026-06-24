@@ -65,13 +65,13 @@ pulse init \
   --project-id "e2e-codex" \
   --no-validate
 
-echo "── Step 2: pulse connect"
+echo "── Step 2: pulse install-hooks"
 mkdir -p ~/.codex
 
-CONNECT_OUTPUT=$(pulse connect 2>&1)
+CONNECT_OUTPUT=$(pulse install-hooks 2>&1)
 echo "$CONNECT_OUTPUT"
 
-assert_eq "connect shows Codex 8/8" "true" \
+assert_eq "install-hooks shows Codex 8/8" "true" \
   "$(echo "$CONNECT_OUTPUT" | grep -q 'Codex: hooks installed' && echo "$CONNECT_OUTPUT" | grep -q '8/8 hooks installed' && echo true || echo false)"
 
 echo "── Step 3: pulse status"
@@ -86,7 +86,9 @@ assert_eq "status shows 8/8 Codex hooks" "true" \
 echo "── Step 4: Running Codex"
 BEFORE_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-CODEX_OUTPUT=$(codex exec --dangerously-bypass-hook-trust \
+mkdir -p /workdir
+
+CODEX_OUTPUT=$(cd /workdir && CODEX_API_KEY="$OPENAI_API_KEY" codex exec --skip-git-repo-check --dangerously-bypass-hook-trust \
   "Reply with exactly: hello" 2>&1 || true)
 echo "Codex output: $CODEX_OUTPUT"
 
@@ -96,7 +98,8 @@ echo "── Step 5: Verifying spans in trace service"
 RESPONSE=$(query_spans "limit=50")
 ALL_SPANS=$(extract_spans "$RESPONSE")
 SESSION_SPANS=$(echo "$ALL_SPANS" | jq --arg ts "$BEFORE_TS" \
-  'map(select(.timestamp >= $ts and .source == "codex"))')
+  'def epoch: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+   map(select((.timestamp | epoch) >= ($ts | epoch) and .source == "codex"))')
 SESSION_COUNT=$(echo "$SESSION_SPANS" | jq 'length')
 
 echo "  Total spans in DB: $(echo "$ALL_SPANS" | jq 'length')"

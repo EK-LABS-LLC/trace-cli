@@ -66,7 +66,7 @@ pulse init \
   --no-validate
 
 mkdir -p ~/.codex
-pulse connect
+pulse install-hooks
 
 mkdir -p /workdir
 echo "Hello from the Codex e2e test file." > /workdir/codex-test.txt
@@ -75,7 +75,7 @@ echo ""
 echo "── Step 1: Running Codex (tool calls)"
 BEFORE_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-CODEX_OUTPUT=$(cd /workdir && codex exec --dangerously-bypass-hook-trust \
+CODEX_OUTPUT=$(cd /workdir && CODEX_API_KEY="$OPENAI_API_KEY" codex exec --skip-git-repo-check --dangerously-bypass-hook-trust \
   "Do these 2 things in order:
 1. Read /workdir/codex-test.txt.
 2. Run the shell command: echo CODEX_TOOL_TEST_OK.
@@ -90,7 +90,8 @@ echo "── Step 2: Querying spans"
 RESPONSE=$(query_spans "limit=200")
 ALL_SPANS=$(extract_spans "$RESPONSE")
 SESSION_SPANS=$(echo "$ALL_SPANS" | jq --arg ts "$BEFORE_TS" \
-  'map(select(.timestamp >= $ts and .source == "codex"))')
+  'def epoch: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+   map(select((.timestamp | epoch) >= ($ts | epoch) and .source == "codex"))')
 SESSION_COUNT=$(echo "$SESSION_SPANS" | jq 'length')
 
 echo "  Codex spans from this session: $SESSION_COUNT"

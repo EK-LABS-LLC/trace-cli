@@ -85,17 +85,17 @@ pulse init \
   --project-id "e2e-test" \
   --no-validate
 
-# ── Step 2: Connect hooks ─────────────────────────────────────────
-echo "── Step 2: pulse connect"
+# ── Step 2: Install hooks ─────────────────────────────────────────
+echo "── Step 2: pulse install-hooks"
 
 # Create Claude settings file so connect can find it
 mkdir -p ~/.claude
 echo '{}' > ~/.claude/settings.json
 
-CONNECT_OUTPUT=$(pulse connect 2>&1)
+CONNECT_OUTPUT=$(pulse install-hooks 2>&1)
 echo "$CONNECT_OUTPUT"
 
-assert_eq "connect shows 10/10" "true" \
+assert_eq "install-hooks shows 10/10" "true" \
   "$(echo "$CONNECT_OUTPUT" | grep -q '10/10' && echo true || echo false)"
 
 # ── Step 3: Verify status ─────────────────────────────────────────
@@ -132,7 +132,8 @@ ALL_SPANS=$(extract_spans "$RESPONSE")
 
 # Filter to only spans from this test run (after BEFORE_TS)
 SESSION_SPANS=$(echo "$ALL_SPANS" | jq --arg ts "$BEFORE_TS" \
-  'map(select(.timestamp >= $ts))')
+  'def epoch: sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601;
+   map(select((.timestamp | epoch) >= ($ts | epoch)))')
 SESSION_COUNT=$(echo "$SESSION_SPANS" | jq 'length')
 
 echo "  Total spans in DB: $(echo "$ALL_SPANS" | jq 'length')"
