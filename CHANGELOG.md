@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fix Claude Hook Install Location
+
+Date: 2026-06-23 16:59:58 CDT; Status: Completed; PR: TBD
+Task: Prevent Claude Code hooks from being installed into a settings file Claude does not load.
+Message: Claude hooks now install to `~/.claude/settings.json`, use the absolute running `pulse` binary path, and migrate old misplaced Pulse hooks out of `settings.local.json`.
+Fixed/Changed: `pulse status`, `install-hooks`, and `disconnect` now recognize migrated/absolute Claude hook commands.
+
 ### Fix CLI Release Version And Installer Start Text
 
 Date: 2026-06-23 16:34:27 CDT; Status: Completed; PR: TBD
