@@ -4,7 +4,7 @@
 
 ### Guard CLI Release Versions
 
-Date: 2026-06-24 18:09 CDT; Status: Completed; PR: pending
+Date: 2026-06-24 18:09 CDT; Status: Completed; PR: #8 https://github.com/EK-LABS-LLC/trace-cli/pull/8
 Task: Prevent CLI releases from shipping with a stale package version.
 Changed: Bumped CLI package version to 0.2.12.
 Added: Release CI now checks the git tag, Cargo.toml, and Cargo.lock versions before building.
