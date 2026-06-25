@@ -4,7 +4,7 @@
 
 ### Fix CLI Version Guard Release Baseline
 
-Date: 2026-06-24 21:10 CDT; Status: Completed; PR: pending
+Date: 2026-06-24 21:10 CDT; Status: Completed; PR: #9 https://github.com/EK-LABS-LLC/trace-cli/pull/9
 Task: Make the CLI version guard compare against released tags, not only main.
 Changed: Bumped CLI package version to 0.2.13.
 Fixed: PR CI now fails unless Cargo.toml/Cargo.lock are above both main and latest release.
