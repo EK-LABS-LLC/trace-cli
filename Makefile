@@ -1,4 +1,4 @@
-.PHONY: build test clean install \
+.PHONY: build test clean install bump \
        e2e e2e-build e2e-down \
        e2e-claude e2e-claude-tools e2e-opencode e2e-opencode-tools \
        e2e-codex e2e-codex-tools
@@ -19,6 +19,10 @@ clean:
 
 install: release
 	cp target/release/pulse ~/.local/bin/pulse
+
+bump:
+	@test -n "$(VERSION)" || (echo "Usage: make bump VERSION=x.y.z"; exit 2)
+	./scripts/bump-version.sh "$(VERSION)"
 
 # ── E2E (run individual suites) ───────────────────────────────────
 
