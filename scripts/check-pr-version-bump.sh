@@ -5,6 +5,10 @@ version_from_toml() {
   sed -nE 's/^version = "([^"]+)"/\1/p' "$1" | head -n 1
 }
 
+latest_tag_version() {
+  git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1 | sed 's/^v//'
+}
+
 version_gt() {
   local current="$1"
   local base="$2"
@@ -50,10 +54,16 @@ base_toml="$(mktemp)"
 trap 'rm -f "$base_toml"' EXIT
 git show "$base_ref:Cargo.toml" > "$base_toml"
 base_version="$(version_from_toml "$base_toml")"
+latest_release_version="$(latest_tag_version)"
 
 if ! version_gt "$current_version" "$base_version"; then
   echo "::error::CLI version must be bumped above $base_version before merging this PR. Current version is $current_version." >&2
   exit 1
 fi
 
-echo "CLI version bump OK: $base_version -> $current_version."
+if [[ -n "$latest_release_version" ]] && ! version_gt "$current_version" "$latest_release_version"; then
+  echo "::error::CLI version must be bumped above latest release v$latest_release_version before merging this PR. Current version is $current_version." >&2
+  exit 1
+fi
+
+echo "CLI version bump OK: main $base_version, latest release v$latest_release_version -> $current_version."
