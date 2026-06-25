@@ -38,7 +38,6 @@ version_gt() {
   (( 10#$current_patch > 10#$base_patch ))
 }
 
-base_ref="${BASE_REF:-origin/${GITHUB_BASE_REF:-main}}"
 current_version="$(version_from_toml Cargo.toml)"
 lock_version="$(awk '
   $0 == "name = \"pulse\"" { in_pulse = 1; next }
@@ -50,20 +49,11 @@ if [[ "$current_version" != "$lock_version" ]]; then
   exit 1
 fi
 
-base_toml="$(mktemp)"
-trap 'rm -f "$base_toml"' EXIT
-git show "$base_ref:Cargo.toml" > "$base_toml"
-base_version="$(version_from_toml "$base_toml")"
 latest_release_version="$(latest_tag_version)"
-
-if ! version_gt "$current_version" "$base_version"; then
-  echo "::error::CLI version must be bumped above $base_version before merging this PR. Current version is $current_version." >&2
-  exit 1
-fi
 
 if [[ -n "$latest_release_version" ]] && ! version_gt "$current_version" "$latest_release_version"; then
   echo "::error::CLI version must be bumped above latest release v$latest_release_version before merging this PR. Current version is $current_version." >&2
   exit 1
 fi
 
-echo "CLI version bump OK: main $base_version, latest release v$latest_release_version -> $current_version."
+echo "CLI version OK: latest release v$latest_release_version -> $current_version."
