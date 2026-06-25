@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Guard CLI Release Versions
+
+Date: 2026-06-24 18:09 CDT; Status: Completed; PR: #8 https://github.com/EK-LABS-LLC/trace-cli/pull/8
+Task: Prevent CLI PRs from merging with a stale package version.
+Changed: Bumped CLI package version to 0.2.12.
+Added: PR CI now checks that Cargo.toml is bumped above main and matches Cargo.lock.
+
 ### Add Codex Hook Support
 
 Date: 2026-06-23 16:51:17 CDT; Status: Completed; PR: TBD

@@ -8,6 +8,18 @@ on:
   workflow_dispatch:
 
 jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CLI version bump
+        run: ./scripts/check-pr-version-bump.sh
+
   test:
     runs-on: ubuntu-latest
     steps:
