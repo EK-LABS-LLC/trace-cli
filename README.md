@@ -98,7 +98,7 @@ For local managed installs, `pulse update` checks the latest `pulse-server`/dash
 pulse restart
 ```
 
-For remote/shared-instance configs, `pulse update` updates only the CLI. Interactive commands also prompt when an update is available. Set `PULSE_SKIP_UPDATE_CHECK=1` to skip the automatic check.
+For remote/shared-instance configs, `pulse update` updates only the CLI. Startup commands such as `pulse up`, `pulse restart`, and `pulse dashboard` also check for updates in interactive terminals. If you skip an update, Pulse will not prompt for that same update again; it prompts again when a newer CLI or server/dashboard release is available. Set `PULSE_SKIP_UPDATE_CHECK=1` to skip the automatic check.
 
 ### Uninstall
 

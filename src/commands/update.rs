@@ -8,7 +8,7 @@ use std::{
 
 use clap::Args;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{ConfigMode, ConfigStore},
@@ -23,6 +23,7 @@ const SERVER_INSTALL_URL: &str =
     "https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scripts/install.sh";
 const SERVER_BINARY: &str = "pulse-server";
 const INSTALL_METADATA_FILE: &str = ".pulse-install.toml";
+const UPDATE_STATE_FILE: &str = "update-state.toml";
 
 #[derive(Args, Debug)]
 pub struct UpdateArgs {
@@ -62,6 +63,30 @@ impl UpdateStatus {
     fn update_available(&self) -> bool {
         self.cli_update_available() || self.server_update_available()
     }
+
+    fn target(&self) -> UpdateTarget {
+        UpdateTarget {
+            latest_cli: self.latest_cli.clone(),
+            latest_server: if self.local_managed {
+                Some(self.latest_server.clone())
+            } else {
+                None
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct UpdateTarget {
+    latest_cli: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    latest_server: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct UpdateState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dismissed: Option<UpdateTarget>,
 }
 
 pub async fn run_update(args: UpdateArgs) -> Result<()> {
@@ -105,6 +130,10 @@ pub async fn maybe_prompt_update() {
         return;
     }
 
+    if update_dismissed(&status) {
+        return;
+    }
+
     print_update_summary(&status);
     match confirm("Update now?") {
         Ok(true) => {
@@ -113,6 +142,9 @@ pub async fn maybe_prompt_update() {
             }
         }
         Ok(false) => {
+            if let Err(err) = dismiss_update(&status) {
+                let _ = writeln!(io::stderr(), "Could not save update preference: {err}");
+            }
             let _ = writeln!(io::stderr(), "Skipping update.");
         }
         Err(_) => {}
@@ -206,6 +238,47 @@ fn confirm(prompt: &str) -> Result<bool> {
     Ok(answer.is_empty() || answer == "y" || answer == "yes")
 }
 
+fn update_state_path() -> Result<PathBuf> {
+    Ok(ConfigStore::config_dir()?.join(UPDATE_STATE_FILE))
+}
+
+fn load_update_state() -> UpdateState {
+    let Ok(path) = update_state_path() else {
+        return UpdateState::default();
+    };
+    let Ok(contents) = fs::read_to_string(path) else {
+        return UpdateState::default();
+    };
+    toml::from_str(&contents).unwrap_or_default()
+}
+
+fn save_update_state(state: &UpdateState) -> Result<()> {
+    let path = update_state_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, toml::to_string_pretty(state)?)?;
+    Ok(())
+}
+
+fn update_dismissed(status: &UpdateStatus) -> bool {
+    dismissed_matches(&load_update_state(), status)
+}
+
+fn dismissed_matches(state: &UpdateState, status: &UpdateStatus) -> bool {
+    state
+        .dismissed
+        .as_ref()
+        .map(|dismissed| dismissed == &status.target())
+        .unwrap_or(false)
+}
+
+fn dismiss_update(status: &UpdateStatus) -> Result<()> {
+    save_update_state(&UpdateState {
+        dismissed: Some(status.target()),
+    })
+}
+
 fn is_local_managed() -> bool {
     ConfigStore::load()
         .map(|config| config.effective_mode() == ConfigMode::Local)
@@ -273,7 +346,10 @@ fn is_newer_version(candidate: &str, current: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_newer_version, parse_version, read_metadata_value};
+    use super::{
+        UpdateState, UpdateStatus, UpdateTarget, dismissed_matches, is_newer_version,
+        parse_version, read_metadata_value,
+    };
     use std::fs;
 
     #[test]
@@ -310,5 +386,82 @@ mod tests {
             read_metadata_value(&path, "server_version").as_deref(),
             Some("v0.2.12")
         );
+    }
+
+    #[test]
+    fn local_update_target_includes_server_release() {
+        let status = UpdateStatus {
+            latest_cli: "v0.2.15".to_string(),
+            current_cli: "0.2.14",
+            latest_server: "v0.2.13".to_string(),
+            current_server: Some("v0.2.12".to_string()),
+            local_managed: true,
+        };
+
+        assert_eq!(
+            status.target(),
+            UpdateTarget {
+                latest_cli: "v0.2.15".to_string(),
+                latest_server: Some("v0.2.13".to_string())
+            }
+        );
+    }
+
+    #[test]
+    fn remote_update_target_tracks_cli_only() {
+        let status = UpdateStatus {
+            latest_cli: "v0.2.15".to_string(),
+            current_cli: "0.2.14",
+            latest_server: "v0.2.13".to_string(),
+            current_server: None,
+            local_managed: false,
+        };
+
+        assert_eq!(
+            status.target(),
+            UpdateTarget {
+                latest_cli: "v0.2.15".to_string(),
+                latest_server: None
+            }
+        );
+    }
+
+    #[test]
+    fn dismissed_target_suppresses_same_update() {
+        let status = UpdateStatus {
+            latest_cli: "v0.2.15".to_string(),
+            current_cli: "0.2.14",
+            latest_server: "v0.2.13".to_string(),
+            current_server: Some("v0.2.12".to_string()),
+            local_managed: true,
+        };
+        let state = UpdateState {
+            dismissed: Some(status.target()),
+        };
+
+        assert!(dismissed_matches(&state, &status));
+    }
+
+    #[test]
+    fn newer_server_release_ignores_old_dismissal() {
+        let old_status = UpdateStatus {
+            latest_cli: "v0.2.15".to_string(),
+            current_cli: "0.2.14",
+            latest_server: "v0.2.13".to_string(),
+            current_server: Some("v0.2.12".to_string()),
+            local_managed: true,
+        };
+        let newer_status = UpdateStatus {
+            latest_cli: "v0.2.15".to_string(),
+            current_cli: "0.2.14",
+            latest_server: "v0.2.14".to_string(),
+            current_server: Some("v0.2.12".to_string()),
+            local_managed: true,
+        };
+        let state = UpdateState {
+            dismissed: Some(old_status.target()),
+        };
+
+        assert!(!dismissed_matches(&state, &newer_status));
     }
 }

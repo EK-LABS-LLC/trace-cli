@@ -80,8 +80,40 @@ async fn main() -> ExitCode {
 }
 
 fn should_check_for_updates(command: &Commands) -> bool {
-    !matches!(
+    matches!(
         command,
-        Commands::Emit(_) | Commands::EmitCodex(_) | Commands::Update(_)
+        Commands::Dashboard(_) | Commands::Up(_) | Commands::Restart(_)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Commands, should_check_for_updates};
+    use pulse::commands::{DashboardArgs, LogsArgs, UpArgs};
+
+    #[test]
+    fn update_prompt_runs_for_startup_commands() {
+        assert!(should_check_for_updates(&Commands::Dashboard(
+            DashboardArgs {
+                api_url: None,
+                dashboard_url: None,
+                no_open: false,
+            }
+        )));
+        assert!(should_check_for_updates(&Commands::Up(UpArgs {
+            open: false
+        })));
+        assert!(should_check_for_updates(&Commands::Restart(UpArgs {
+            open: false
+        })));
+    }
+
+    #[test]
+    fn update_prompt_skips_non_startup_commands() {
+        assert!(!should_check_for_updates(&Commands::Status));
+        assert!(!should_check_for_updates(&Commands::Logs(LogsArgs {
+            follow: false,
+            lines: 10,
+        })));
+    }
 }
