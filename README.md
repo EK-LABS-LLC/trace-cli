@@ -86,6 +86,20 @@ Remote/shared-instance CLI users:
 curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.sh | sh
 ```
 
+You can also run:
+
+```bash
+pulse update
+```
+
+For local managed installs, `pulse update` checks the latest `pulse-server`/dashboard release and the latest CLI release. If any part is out of date, it updates the server binary, dashboard assets, and CLI in place without removing `~/.pulse` data. If the server is already running, restart it after updating:
+
+```bash
+pulse restart
+```
+
+For remote/shared-instance configs, `pulse update` updates only the CLI. Interactive commands also prompt when an update is available. Set `PULSE_SKIP_UPDATE_CHECK=1` to skip the automatic check.
+
 ### Uninstall
 
 ```bash
@@ -105,6 +119,7 @@ curl -fsSL https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scri
 | `pulse restart` | Restart the managed local Pulse server |
 | `pulse logs` | Show or follow managed local server logs |
 | `pulse dashboard` | Open the current Pulse dashboard URL |
+| `pulse update` | Update stale local Pulse components |
 | `pulse init` | Deprecated alias for `pulse connect` |
 | `pulse connect` | Configure a remote Pulse instance and install hooks |
 | `pulse disconnect` | Remove all Pulse hooks from all agents |

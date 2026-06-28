@@ -3,9 +3,9 @@ use std::process::ExitCode;
 
 use pulse::commands::{
     ConnectArgs, DashboardArgs, EmitArgs, EmitCodexArgs, InitArgs, InstallHooksArgs, LogsArgs,
-    SetupArgs, UpArgs, run_connect, run_dashboard, run_disconnect, run_down, run_emit,
-    run_emit_codex, run_init, run_install_hooks, run_logs, run_restart, run_setup, run_status,
-    run_up,
+    SetupArgs, UpArgs, UpdateArgs, maybe_prompt_update, run_connect, run_dashboard, run_disconnect,
+    run_down, run_emit, run_emit_codex, run_init, run_install_hooks, run_logs, run_restart,
+    run_setup, run_status, run_up, run_update,
 };
 use pulse::error::Result;
 
@@ -36,11 +36,17 @@ enum Commands {
     #[command(hide = true)]
     EmitCodex(EmitCodexArgs),
     InstallHooks(InstallHooksArgs),
+    Update(UpdateArgs),
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
+
+    if should_check_for_updates(&cli.command) {
+        maybe_prompt_update().await;
+    }
+
     let result: Result<()> = match cli.command {
         Commands::Init(args) => run_init(args).await,
         Commands::Setup(args) => run_setup(args).await,
@@ -61,6 +67,7 @@ async fn main() -> ExitCode {
             Ok(())
         }
         Commands::InstallHooks(args) => run_install_hooks(args).await,
+        Commands::Update(args) => run_update(args).await,
     };
 
     match result {
@@ -70,4 +77,11 @@ async fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn should_check_for_updates(command: &Commands) -> bool {
+    !matches!(
+        command,
+        Commands::Emit(_) | Commands::EmitCodex(_) | Commands::Update(_)
+    )
 }

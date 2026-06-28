@@ -8,6 +8,7 @@ pub mod install_hooks;
 pub mod local;
 pub mod setup;
 pub mod status;
+pub mod update;
 
 use crate::error::Result;
 use crate::hooks::{ClaudeCodeHook, CodexHook, OpenClawHook, OpenCodeHook, ToolHook};
@@ -22,6 +23,7 @@ pub use install_hooks::{InstallHooksArgs, run_install_hooks};
 pub use local::{LogsArgs, UpArgs, run_down, run_logs, run_restart, run_up};
 pub use setup::{SetupArgs, run_setup};
 pub use status::run_status;
+pub use update::{UpdateArgs, maybe_prompt_update, run_update};
 
 pub(crate) fn registered_hooks() -> Result<Vec<Box<dyn ToolHook>>> {
     let mut hooks: Vec<Box<dyn ToolHook>> = Vec::new();
