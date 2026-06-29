@@ -17,10 +17,8 @@ use crate::{
 
 const CLI_REPO: &str = "EK-LABS-LLC/trace-cli";
 const SERVER_REPO: &str = "EK-LABS-LLC/trace-service";
-const CLI_INSTALL_URL: &str =
-    "https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/main/install.sh";
-const SERVER_INSTALL_URL: &str =
-    "https://raw.githubusercontent.com/EK-LABS-LLC/trace-service/main/scripts/install.sh";
+const CLI_INSTALL_PATH: &str = "install.sh";
+const SERVER_INSTALL_PATH: &str = "scripts/install.sh";
 const SERVER_BINARY: &str = "pulse-server";
 const INSTALL_METADATA_FILE: &str = ".pulse-install.toml";
 const UPDATE_STATE_FILE: &str = "update-state.toml";
@@ -152,9 +150,13 @@ pub async fn maybe_prompt_update() {
 }
 
 async fn update_status() -> Result<UpdateStatus> {
-    let latest_cli = latest_release(CLI_REPO).await?;
-    let latest_server = latest_release(SERVER_REPO).await?;
     let local_managed = is_local_managed();
+    let latest_cli = latest_release(CLI_REPO).await?;
+    let latest_server = if local_managed {
+        latest_release(SERVER_REPO).await?
+    } else {
+        String::new()
+    };
     let current_server = if local_managed {
         installed_server_version()
     } else {
@@ -204,15 +206,32 @@ fn print_update_summary(status: &UpdateStatus) {
 fn install_updates(status: &UpdateStatus) -> Result<()> {
     if status.local_managed {
         println!("Updating Pulse server, dashboard assets, and CLI...");
+        let install_url =
+            raw_installer_url(SERVER_REPO, &status.latest_server, SERVER_INSTALL_PATH)?;
         run_shell_install(&format!(
-            "curl -fsSL {SERVER_INSTALL_URL} | bash -s -- pulse-server"
+            "curl -fsSL {install_url} | bash -s -- pulse-server --version {} --cli-version {}",
+            status.latest_server, status.latest_cli
         ))?;
         println!("Update complete. If Pulse server is already running, run `pulse restart`.");
         return Ok(());
     }
 
     println!("Updating Pulse CLI...");
-    run_shell_install(&format!("curl -fsSL {CLI_INSTALL_URL} | sh"))
+    let install_url = raw_installer_url(CLI_REPO, &status.latest_cli, CLI_INSTALL_PATH)?;
+    run_shell_install(&format!(
+        "curl -fsSL {install_url} | PULSE_VERSION={} sh",
+        status.latest_cli
+    ))
+}
+
+fn raw_installer_url(repo: &str, tag: &str, path: &str) -> Result<String> {
+    if parse_version(tag).is_none() {
+        return Err(PulseError::message(format!("invalid release tag `{tag}`")));
+    }
+
+    Ok(format!(
+        "https://raw.githubusercontent.com/{repo}/{tag}/{path}"
+    ))
 }
 
 fn run_shell_install(command: &str) -> Result<()> {
@@ -304,16 +323,8 @@ fn find_on_path(binary: &str) -> Option<PathBuf> {
 
 fn read_metadata_value(path: &Path, key: &str) -> Option<String> {
     let contents = fs::read_to_string(path).ok()?;
-    for line in contents.lines() {
-        let line = line.trim();
-        let Some((line_key, value)) = line.split_once('=') else {
-            continue;
-        };
-        if line_key.trim() == key {
-            return Some(value.trim().trim_matches('"').to_string());
-        }
-    }
-    None
+    let metadata: toml::Value = toml::from_str(&contents).ok()?;
+    metadata.get(key)?.as_str().map(ToOwned::to_owned)
 }
 
 fn current_version() -> &'static str {
@@ -348,7 +359,7 @@ fn is_newer_version(candidate: &str, current: &str) -> bool {
 mod tests {
     use super::{
         UpdateState, UpdateStatus, UpdateTarget, dismissed_matches, is_newer_version,
-        parse_version, read_metadata_value,
+        parse_version, raw_installer_url, read_metadata_value,
     };
     use std::fs;
 
@@ -378,7 +389,7 @@ mod tests {
         let path = dir.path().join(".pulse-install.toml");
         fs::write(
             &path,
-            "server_version = \"v0.2.12\"\ncli_version = \"v0.2.14\"\n",
+            "server_version = \"v0.2.12\" # installed server release\ncli_version = \"v0.2.14\"\n",
         )
         .unwrap();
 
@@ -386,6 +397,19 @@ mod tests {
             read_metadata_value(&path, "server_version").as_deref(),
             Some("v0.2.12")
         );
+    }
+
+    #[test]
+    fn builds_release_tagged_installer_urls() {
+        assert_eq!(
+            raw_installer_url("EK-LABS-LLC/trace-cli", "v0.2.15", "install.sh").unwrap(),
+            "https://raw.githubusercontent.com/EK-LABS-LLC/trace-cli/v0.2.15/install.sh"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_installer_release_tags() {
+        assert!(raw_installer_url("EK-LABS-LLC/trace-cli", "main", "install.sh").is_err());
     }
 
     #[test]
