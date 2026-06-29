@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Add Component-Aware Update Prompt
+
+Date: 2026-06-28 00:00 CDT; Status: Completed; PR: #11 https://github.com/EK-LABS-LLC/trace-cli/pull/11
+Task: Prompt when CLI or local server/dashboard releases are stale.
+Changed: Bumped CLI package version to 0.2.15.
+Added: `pulse update`, startup update prompts, and per-version dismissal.
+
 ### Fix CLI Version Guard Release Baseline
 
 Date: 2026-06-24 21:10 CDT; Status: Completed; PR: #10 https://github.com/EK-LABS-LLC/trace-cli/pull/10
