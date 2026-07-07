@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Emit Agent Hooks As OTLP Traces
+
+Date: 2026-07-06 CDT; Status: Completed; PR: TBD
+Task: Send Claude Code, Codex, OpenCode, and OpenClaw hook events through the canonical OTLP HTTP JSON trace ingest path.
+Changed: Bumped CLI package version to 0.2.16.
+Added/Changed: Hook emission now POSTs OTLP-shaped data to `/v1/traces`, uses `agent.turn` for user prompt turns, attaches turn events with OTel trace/span/parent IDs when active-turn state is available, and preserves session naming in `pulse.session.name`.
+
 ### Add Component-Aware Update Prompt
 
 Date: 2026-06-28 00:00 CDT; Status: Completed; PR: #11 https://github.com/EK-LABS-LLC/trace-cli/pull/11

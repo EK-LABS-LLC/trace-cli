@@ -1,6 +1,6 @@
 ---
 name: pulse-hook
-description: "Pulse observability – emits session and message spans"
+description: "Pulse observability - emits session and message traces"
 metadata:
   openclaw:
     emoji: "📡"

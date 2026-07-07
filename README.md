@@ -271,13 +271,15 @@ When an agent fires an event (tool call, session start, etc.), it pipes JSON to 
 
 1. Reads the JSON payload from stdin
 2. Extracts structured fields based on event type
-3. Builds a span with a UUID, timestamp, and metadata
-4. POSTs it to the trace service at `/v1/spans/async`
+3. Builds an OTLP HTTP JSON trace payload with Pulse attributes
+4. POSTs it to the trace service at `/v1/traces`
 
 **Claude Code** calls `pulse emit` directly from its hook system.
-**Codex** calls `pulse emit-codex` from its lifecycle hooks, which normalizes Codex hook payloads into Pulse spans.
+**Codex** calls `pulse emit-codex` from its lifecycle hooks, which normalizes Codex hook payloads into Pulse OTLP traces.
 **OpenCode** runs a plugin that calls `Bun.spawn(["pulse", "emit", ...])`.
 **OpenClaw** runs a handler that calls `child_process.spawn("pulse", ["emit", ...])`.
+
+`user_prompt_submit` opens an `agent.turn` trace. Assistant, tool, subagent, and stop events attach to the active turn when the CLI can resolve active-turn state; lifecycle-only events use `agent.session_lifecycle`.
 
 The `emit` command is designed for the hot path:
 - Exits `0` regardless of failures
@@ -292,27 +294,28 @@ export PULSE_DEBUG=1
 
 Logs raw payloads to `~/.pulse/debug.log`. Override path with `PULSE_DEBUG_LOG=/path/to/file`.
 
-## Span Schema
+## Trace Schema
 
-Each span sent to the trace service includes:
+Each hook emission sends an OTLP JSON payload with `resourceSpans[].scopeSpans[].spans[]`. Pulse-specific fields are stored as span or resource attributes:
 
 | Field | Description |
 |-------|-------------|
-| `span_id` | UUID v4 |
-| `session_id` | Agent session identifier |
-| `timestamp` | ISO 8601 |
-| `source` | `claude_code`, `codex`, `opencode`, or `openclaw` |
-| `kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, `llm_response`, or `notification` |
-| `event_type` | The specific event (e.g. `post_tool_use`, `session_start`) |
-| `status` | `success` or `error` |
-| `tool_name` | Tool name (tool events only) |
-| `tool_input` | Tool input payload (tool events only) |
-| `tool_response` | Tool response (`post_tool_use` only) |
-| `error` | Error details (failures only) |
-| `cwd` | Working directory |
-| `model` | Model name |
-| `agent_name` | Subagent type (subagent events only) |
-| `metadata` | Contains `cli_version`, `project_id`, and event-specific data |
+| `traceId` | OTel trace ID; active turn events share the turn trace where possible |
+| `spanId` | OTel span ID |
+| `parentSpanId` | Active `agent.turn` span ID for assistant/tool/subagent/stop events when available |
+| `name` | `agent.turn`, `agent.tool`, `agent.assistant`, `agent.subagent`, `agent.stop`, or `agent.session_lifecycle` |
+| `pulse.session.id` | Agent session identifier |
+| `pulse.session.name` | Session display name, currently preserving the session identifier fallback |
+| `pulse.source` | `claude_code`, `codex`, `opencode`, or `openclaw` |
+| `pulse.event.type` | The specific event (e.g. `post_tool_use`, `session_start`) |
+| `pulse.event.kind` | `tool_use`, `session`, `agent_run`, `user_prompt`, `llm_response`, or `notification` |
+| `pulse.event.status` | `success` or `error` |
+| `pulse.tool.*` | Tool id, name, input, and response attributes for tool events |
+| `pulse.error` | Error details for failures |
+| `pulse.cwd` | Working directory |
+| `pulse.model` | Model name |
+| `pulse.agent.name` | Subagent type |
+| `pulse.metadata` | Contains `cli_version`, `project_id`, raw hook payload, and event-specific data |
 
 ## Local Development
 

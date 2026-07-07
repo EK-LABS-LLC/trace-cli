@@ -2,7 +2,7 @@ import { spawn } from "child_process";
 
 const SOURCE = "openclaw";
 
-function emitSpan(eventType: string, payload: Record<string, unknown>): void {
+function emitTrace(eventType: string, payload: Record<string, unknown>): void {
   const proc = spawn("pulse", ["emit", eventType], {
     stdio: ["pipe", "ignore", "ignore"],
   });
@@ -52,23 +52,23 @@ export default async function handler(event: OpenClawEvent): Promise<void> {
   switch (eventKey) {
     case "command:new": {
       const model = event.context?.cfg?.agents?.defaults?.model?.primary;
-      emitSpan("session_start", { ...base, model });
+      emitTrace("session_start", { ...base, model });
       break;
     }
     case "command:stop":
-      emitSpan("stop", base);
+      emitTrace("stop", base);
       break;
     case "command:reset":
-      emitSpan("session_end", { ...base, reason: "reset" });
+      emitTrace("session_end", { ...base, reason: "reset" });
       break;
     case "message:received":
-      emitSpan("user_prompt_submit", {
+      emitTrace("user_prompt_submit", {
         ...base,
         prompt: event.context?.content,
       });
       break;
     case "message:sent":
-      emitSpan("notification", {
+      emitTrace("notification", {
         ...base,
         message: event.context?.content,
       });
