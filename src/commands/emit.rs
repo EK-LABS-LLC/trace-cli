@@ -1,13 +1,15 @@
 use std::{
     collections::BTreeMap,
-    fs,
-    io::{self, Read},
+    fs::{self, OpenOptions},
+    io::{self, Read, Write},
 };
 
 use chrono::Utc;
 use clap::Args;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tempfile::NamedTempFile;
 use uuid::Uuid;
 
 use crate::{
@@ -138,30 +140,40 @@ fn active_turn_key(source: &str, session_id: &str) -> String {
     format!("{source}:{session_id}")
 }
 
-fn read_active_turns() -> BTreeMap<String, ActiveTurn> {
-    let path = match ConfigStore::run_dir() {
-        Ok(dir) => dir.join("active-turns.json"),
-        Err(_) => return BTreeMap::new(),
-    };
-    let body = match fs::read_to_string(path) {
-        Ok(body) => body,
-        Err(_) => return BTreeMap::new(),
-    };
-    serde_json::from_str(&body).unwrap_or_default()
-}
-
-fn write_active_turns(turns: &BTreeMap<String, ActiveTurn>) {
+fn with_active_turns<T>(
+    update: impl FnOnce(&mut BTreeMap<String, ActiveTurn>) -> (T, bool),
+) -> Option<T> {
     let run_dir = match ConfigStore::run_dir() {
         Ok(dir) => dir,
-        Err(_) => return,
+        Err(_) => return None,
     };
     if fs::create_dir_all(&run_dir).is_err() {
-        return;
+        return None;
     }
+
+    let lock = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(run_dir.join("active-turns.lock"))
+        .ok()?;
+    lock.lock_exclusive().ok()?;
+
     let path = run_dir.join("active-turns.json");
-    if let Ok(body) = serde_json::to_string(turns) {
-        let _ = fs::write(path, body);
+    let mut turns = fs::read_to_string(&path)
+        .ok()
+        .and_then(|body| serde_json::from_str(&body).ok())
+        .unwrap_or_default();
+    let (result, changed) = update(&mut turns);
+
+    if changed {
+        let mut temp = NamedTempFile::new_in(&run_dir).ok()?;
+        serde_json::to_writer(temp.as_file_mut(), &turns).ok()?;
+        temp.as_file_mut().flush().ok()?;
+        temp.persist(path).ok()?;
     }
+
+    Some(result)
 }
 
 fn resolve_span_context(
@@ -178,15 +190,14 @@ fn resolve_span_context(
         let trace_id =
             stable_trace_id(&["pulse", "turn", project_id, source, session_id, &identity]);
         let span_id = stable_span_id(&["pulse", "span", &trace_id, "agent.turn"]);
-        let mut turns = read_active_turns();
-        turns.insert(
-            key,
-            ActiveTurn {
-                trace_id: trace_id.clone(),
-                span_id: span_id.clone(),
-            },
-        );
-        write_active_turns(&turns);
+        let active = ActiveTurn {
+            trace_id: trace_id.clone(),
+            span_id: span_id.clone(),
+        };
+        let _ = with_active_turns(|turns| {
+            turns.insert(key, active);
+            ((), true)
+        });
         return ResolvedSpanContext {
             trace_id,
             span_id,
@@ -195,12 +206,16 @@ fn resolve_span_context(
     }
 
     if span::event_type_attaches_to_turn(event_type) {
-        let mut turns = read_active_turns();
-        if let Some(active) = turns.get(&key).cloned() {
-            if event_type == "stop" {
+        let active = with_active_turns(|turns| {
+            let active = turns.get(&key).cloned();
+            let changed = active.is_some() && event_type == "stop";
+            if changed {
                 turns.remove(&key);
-                write_active_turns(&turns);
             }
+            (active, changed)
+        })
+        .flatten();
+        if let Some(active) = active {
             let identity = event_identity(event_type, payload);
             let span_id = identity
                 .as_deref()
@@ -217,10 +232,10 @@ fn resolve_span_context(
     }
 
     if matches!(event_type, "session_end") {
-        let mut turns = read_active_turns();
-        if turns.remove(&key).is_some() {
-            write_active_turns(&turns);
-        }
+        let _ = with_active_turns(|turns| {
+            let changed = turns.remove(&key).is_some();
+            ((), changed)
+        });
     }
 
     let trace_id = stable_trace_id(&["pulse", "session_lifecycle", project_id, source, session_id]);
