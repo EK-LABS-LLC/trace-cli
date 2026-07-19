@@ -117,11 +117,11 @@ fn event_identity(event_type: &str, payload: &Value) -> Option<String> {
         "event_id",
         "message_id",
         "prompt_id",
-        "turn_id",
         "request_id",
         "tool_use_id",
         "agent_id",
         "call_id",
+        "turn_id",
         "timestamp",
     ] {
         if let Some(value) = str_payload_field(payload, key) {
@@ -351,4 +351,31 @@ pub async fn emit_payload(
     let _ = client.post_traces(&traces).await;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::event_identity;
+    use serde_json::json;
+
+    #[test]
+    fn tool_identity_prefers_tool_use_id_over_shared_turn_id() {
+        let first = json!({
+            "turn_id": "turn-1",
+            "tool_use_id": "tool-1"
+        });
+        let second = json!({
+            "turn_id": "turn-1",
+            "tool_use_id": "tool-2"
+        });
+
+        assert_eq!(
+            event_identity("pre_tool_use", &first).as_deref(),
+            Some("tool_use_id:tool-1")
+        );
+        assert_eq!(
+            event_identity("pre_tool_use", &second).as_deref(),
+            Some("tool_use_id:tool-2")
+        );
+    }
 }
