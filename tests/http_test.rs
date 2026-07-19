@@ -11,13 +11,13 @@ fn minimal_span() -> OtlpSpan {
         start_time_unix_nano: "1735689600000000000".to_string(),
         end_time_unix_nano: "1735689600000000000".to_string(),
         attributes: vec![
-            OtlpAttribute::string("pulse.session.id", "sess_123"),
-            OtlpAttribute::string("pulse.session.name", "sess_123"),
+            OtlpAttribute::string("pulse.session_id", "sess_123"),
+            OtlpAttribute::string("pulse.session_name", "sess_123"),
             OtlpAttribute::string("pulse.source", "claude_code"),
-            OtlpAttribute::string("pulse.event.type", "post_tool_use"),
+            OtlpAttribute::string("pulse.event_type", "post_tool_use"),
         ],
         status: OtlpStatus {
-            code: "STATUS_CODE_OK".to_string(),
+            code: 1,
             message: None,
         },
     }
@@ -63,14 +63,14 @@ fn serialization_includes_pulse_attributes() {
             .expect("attribute should exist")
     };
 
-    assert_eq!(attr("pulse.session.id")["value"]["stringValue"], "sess_123");
+    assert_eq!(attr("pulse.session_id")["value"]["stringValue"], "sess_123");
     assert_eq!(
-        attr("pulse.session.name")["value"]["stringValue"],
+        attr("pulse.session_name")["value"]["stringValue"],
         "sess_123"
     );
     assert_eq!(attr("pulse.source")["value"]["stringValue"], "claude_code");
     assert_eq!(
-        attr("pulse.event.type")["value"]["stringValue"],
+        attr("pulse.event_type")["value"]["stringValue"],
         "post_tool_use"
     );
 }

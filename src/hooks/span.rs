@@ -58,11 +58,7 @@ impl SpanFields {
             end_time_unix_nano: timestamp_unix_nano,
             attributes: self.into_attributes(&session_id, &event_type, &source),
             status: OtlpStatus {
-                code: if status == "error" {
-                    "STATUS_CODE_ERROR".to_string()
-                } else {
-                    "STATUS_CODE_OK".to_string()
-                },
+                code: if status == "error" { 2 } else { 1 },
                 message: None,
             },
         })
@@ -75,15 +71,14 @@ impl SpanFields {
         source: &str,
     ) -> Vec<OtlpAttribute> {
         let mut attrs = vec![
-            OtlpAttribute::string("pulse.session.id", session_id),
+            OtlpAttribute::string("pulse.session_id", session_id),
             OtlpAttribute::string(
-                "pulse.session.name",
+                "pulse.session_name",
                 self.session_name.unwrap_or_else(|| session_id.to_string()),
             ),
             OtlpAttribute::string("pulse.source", source),
-            OtlpAttribute::string("pulse.event.type", event_type),
-            OtlpAttribute::string("pulse.event.kind", event_type_to_kind(event_type)),
-            OtlpAttribute::string("pulse.event.status", event_type_to_status(event_type)),
+            OtlpAttribute::string("pulse.event_type", event_type),
+            OtlpAttribute::string("pulse.kind", event_type_to_kind(event_type)),
         ];
 
         push_string_attr(&mut attrs, "pulse.cwd", self.cwd);

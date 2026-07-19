@@ -305,14 +305,14 @@ fn into_otlp_span_builds_correct_payload() {
     assert_eq!(span.parent_span_id.as_deref(), Some("parent-id-456"));
     assert_eq!(span.name, "agent.tool");
     assert_eq!(span.kind, "SPAN_KIND_INTERNAL");
-    assert_eq!(span.status.code, "STATUS_CODE_OK");
-    assert_eq!(attr("pulse.session.id")["value"]["stringValue"], "sess_1");
-    assert_eq!(attr("pulse.session.name")["value"]["stringValue"], "sess_1");
+    assert_eq!(span.status.code, 1);
+    assert_eq!(attr("pulse.session_id")["value"]["stringValue"], "sess_1");
+    assert_eq!(attr("pulse.session_name")["value"]["stringValue"], "sess_1");
     assert_eq!(
-        attr("pulse.event.type")["value"]["stringValue"],
+        attr("pulse.event_type")["value"]["stringValue"],
         "post_tool_use"
     );
-    assert_eq!(attr("pulse.event.kind")["value"]["stringValue"], "tool_use");
+    assert_eq!(attr("pulse.kind")["value"]["stringValue"], "tool_use");
     assert_eq!(attr("pulse.source")["value"]["stringValue"], "claude_code");
     assert_eq!(attr("pulse.tool.name")["value"]["stringValue"], "Bash");
     assert_eq!(attr("pulse.cwd")["value"]["stringValue"], "/tmp");

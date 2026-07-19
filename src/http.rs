@@ -143,7 +143,7 @@ pub struct OtlpSpan {
 
 #[derive(Debug, Serialize)]
 pub struct OtlpStatus {
-    pub code: String,
+    pub code: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
