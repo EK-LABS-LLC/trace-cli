@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Emit Agent Hooks As OTLP Traces
+
+Date: 2026-07-19 CDT; Status: Completed; PR: #12 https://github.com/EK-LABS-LLC/trace-cli/pull/12
+Task: Send Claude Code, Codex, OpenCode, and OpenClaw hook events through the canonical OTLP HTTP JSON trace ingest path.
+Changed: Bumped CLI package version to 0.2.16.
+Added/Changed: Hook emission now POSTs OTLP-shaped data to `/v1/traces`, uses `agent.turn` for user prompt turns, attaches turn events with OTel trace/span/parent IDs when active-turn state is available, and uses the service contract's canonical `pulse.session_id`, `pulse.session_name`, `pulse.event_type`, and `pulse.kind` attributes with numeric OTLP status codes.
+Fixed: The Codex Docker tool E2E now disables Codex's nested shell sandbox inside the disposable test container and fails unless the requested file read and shell command actually succeed.
+Fixed: Tool and subagent event identity now prefers operation-specific IDs over a shared turn ID, preventing multiple operations in one turn from colliding during idempotent database insertion.
+
 ### Add Component-Aware Update Prompt
 
 Date: 2026-06-28 00:00 CDT; Status: Completed; PR: #11 https://github.com/EK-LABS-LLC/trace-cli/pull/11

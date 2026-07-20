@@ -36,6 +36,28 @@ fn event_type_to_status_mappings() {
 }
 
 #[test]
+fn event_type_to_span_name_mappings() {
+    assert_eq!(
+        span::event_type_to_span_name("user_prompt_submit"),
+        "agent.turn"
+    );
+    assert_eq!(span::event_type_to_span_name("pre_tool_use"), "agent.tool");
+    assert_eq!(
+        span::event_type_to_span_name("assistant_message"),
+        "agent.assistant"
+    );
+    assert_eq!(
+        span::event_type_to_span_name("subagent_start"),
+        "agent.subagent"
+    );
+    assert_eq!(span::event_type_to_span_name("stop"), "agent.stop");
+    assert_eq!(
+        span::event_type_to_span_name("session_start"),
+        "agent.session_lifecycle"
+    );
+}
+
+#[test]
 fn extract_common_fields() {
     let payload = json!({
         "session_id": "sess_123",
@@ -234,12 +256,14 @@ fn extract_unknown_event_type() {
 }
 
 #[test]
-fn into_span_returns_none_without_session_id() {
+fn into_otlp_span_returns_none_without_session_id() {
     let payload = json!({"tool_name": "Bash"});
     let fields = span::extract("post_tool_use", &payload);
-    let span = fields.into_span(
+    let span = fields.into_otlp_span(
+        "trace-id".to_string(),
         "span-id".to_string(),
-        "2025-01-01T00:00:00Z".to_string(),
+        None,
+        "1735689600000000000".to_string(),
         "post_tool_use".to_string(),
         "claude_code".to_string(),
     );
@@ -247,7 +271,7 @@ fn into_span_returns_none_without_session_id() {
 }
 
 #[test]
-fn into_span_builds_correct_payload() {
+fn into_otlp_span_builds_correct_payload() {
     let payload = json!({
         "session_id": "sess_1",
         "tool_use_id": "tu_1",
@@ -257,20 +281,39 @@ fn into_span_builds_correct_payload() {
     });
     let fields = span::extract("post_tool_use", &payload);
     let span = fields
-        .into_span(
+        .into_otlp_span(
+            "550e8400e29b41d4a716446655440000".to_string(),
             "span-id-123".to_string(),
-            "2025-01-01T00:00:00Z".to_string(),
+            Some("parent-id-456".to_string()),
+            "1735689600000000000".to_string(),
             "post_tool_use".to_string(),
             "claude_code".to_string(),
         )
         .unwrap();
 
+    let span_json = serde_json::to_value(&span).unwrap();
+    let attrs = span_json["attributes"].as_array().unwrap();
+    let attr = |key: &str| {
+        attrs
+            .iter()
+            .find(|attr| attr["key"] == key)
+            .expect("attribute should exist")
+    };
+
+    assert_eq!(span.trace_id, "550e8400e29b41d4a716446655440000");
     assert_eq!(span.span_id, "span-id-123");
-    assert_eq!(span.session_id, "sess_1");
-    assert_eq!(span.event_type, "post_tool_use");
-    assert_eq!(span.kind, "tool_use");
-    assert_eq!(span.status, "success");
-    assert_eq!(span.source, "claude_code");
-    assert_eq!(span.tool_name.as_deref(), Some("Bash"));
-    assert_eq!(span.cwd.as_deref(), Some("/tmp"));
+    assert_eq!(span.parent_span_id.as_deref(), Some("parent-id-456"));
+    assert_eq!(span.name, "agent.tool");
+    assert_eq!(span.kind, "SPAN_KIND_INTERNAL");
+    assert_eq!(span.status.code, 1);
+    assert_eq!(attr("pulse.session_id")["value"]["stringValue"], "sess_1");
+    assert_eq!(attr("pulse.session_name")["value"]["stringValue"], "sess_1");
+    assert_eq!(
+        attr("pulse.event_type")["value"]["stringValue"],
+        "post_tool_use"
+    );
+    assert_eq!(attr("pulse.kind")["value"]["stringValue"], "tool_use");
+    assert_eq!(attr("pulse.source")["value"]["stringValue"], "claude_code");
+    assert_eq!(attr("pulse.tool.name")["value"]["stringValue"], "Bash");
+    assert_eq!(attr("pulse.cwd")["value"]["stringValue"], "/tmp");
 }

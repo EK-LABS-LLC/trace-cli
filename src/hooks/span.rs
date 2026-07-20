@@ -1,9 +1,10 @@
 use serde_json::Value;
 
-use crate::http::SpanPayload;
+use crate::http::{OtlpAttribute, OtlpSpan, OtlpStatus};
 
 pub struct SpanFields {
     pub session_id: Option<String>,
+    pub session_name: Option<String>,
     pub cwd: Option<String>,
     pub tool_use_id: Option<String>,
     pub tool_name: Option<String>,
@@ -21,6 +22,7 @@ impl SpanFields {
     fn new() -> Self {
         Self {
             session_id: None,
+            session_name: None,
             cwd: None,
             tool_use_id: None,
             tool_name: None,
@@ -35,35 +37,64 @@ impl SpanFields {
         }
     }
 
-    pub fn into_span(
+    pub fn into_otlp_span(
         self,
+        trace_id: String,
         span_id: String,
-        timestamp: String,
+        parent_span_id: Option<String>,
+        timestamp_unix_nano: String,
         event_type: String,
         source: String,
-    ) -> Option<SpanPayload> {
-        let session_id = self.session_id?;
-        Some(SpanPayload {
+    ) -> Option<OtlpSpan> {
+        let session_id = self.session_id.clone()?;
+        let status = event_type_to_status(&event_type);
+        Some(OtlpSpan {
+            trace_id,
             span_id,
-            session_id,
-            parent_span_id: None,
-            timestamp,
-            duration_ms: None,
-            source,
-            kind: event_type_to_kind(&event_type).to_string(),
-            status: event_type_to_status(&event_type).to_string(),
-            event_type,
-            tool_use_id: self.tool_use_id,
-            tool_name: self.tool_name,
-            tool_input: self.tool_input,
-            tool_response: self.tool_response,
-            error: self.error,
-            is_interrupt: self.is_interrupt,
-            cwd: self.cwd,
-            model: self.model,
-            agent_name: self.agent_name,
-            metadata: self.metadata,
+            parent_span_id,
+            name: event_type_to_span_name(&event_type).to_string(),
+            kind: "SPAN_KIND_INTERNAL".to_string(),
+            start_time_unix_nano: timestamp_unix_nano.clone(),
+            end_time_unix_nano: timestamp_unix_nano,
+            attributes: self.into_attributes(&session_id, &event_type, &source),
+            status: OtlpStatus {
+                code: if status == "error" { 2 } else { 1 },
+                message: None,
+            },
         })
+    }
+
+    fn into_attributes(
+        self,
+        session_id: &str,
+        event_type: &str,
+        source: &str,
+    ) -> Vec<OtlpAttribute> {
+        let mut attrs = vec![
+            OtlpAttribute::string("pulse.session_id", session_id),
+            OtlpAttribute::string(
+                "pulse.session_name",
+                self.session_name.unwrap_or_else(|| session_id.to_string()),
+            ),
+            OtlpAttribute::string("pulse.source", source),
+            OtlpAttribute::string("pulse.event_type", event_type),
+            OtlpAttribute::string("pulse.kind", event_type_to_kind(event_type)),
+        ];
+
+        push_string_attr(&mut attrs, "pulse.cwd", self.cwd);
+        push_string_attr(&mut attrs, "pulse.model", self.model);
+        push_string_attr(&mut attrs, "pulse.tool.id", self.tool_use_id);
+        push_string_attr(&mut attrs, "pulse.tool.name", self.tool_name);
+        push_json_attr(&mut attrs, "pulse.tool.input", self.tool_input);
+        push_json_attr(&mut attrs, "pulse.tool.response", self.tool_response);
+        push_json_attr(&mut attrs, "pulse.error", self.error);
+        if let Some(is_interrupt) = self.is_interrupt {
+            attrs.push(OtlpAttribute::bool("pulse.is_interrupt", is_interrupt));
+        }
+        push_string_attr(&mut attrs, "pulse.agent.name", self.agent_name);
+        push_json_attr(&mut attrs, "pulse.metadata", self.metadata);
+
+        attrs
     }
 }
 
@@ -101,6 +132,37 @@ pub fn event_type_to_kind(event_type: &str) -> &str {
     }
 }
 
+pub fn event_type_to_span_name(event_type: &str) -> &str {
+    match event_type {
+        "user_prompt_submit" => "agent.turn",
+        "pre_tool_use" | "post_tool_use" | "post_tool_use_failure" | "permission_request" => {
+            "agent.tool"
+        }
+        "assistant_message" => "agent.assistant",
+        "subagent_start" | "subagent_stop" => "agent.subagent",
+        "stop" => "agent.stop",
+        _ => "agent.session_lifecycle",
+    }
+}
+
+pub fn event_type_is_turn_start(event_type: &str) -> bool {
+    event_type == "user_prompt_submit"
+}
+
+pub fn event_type_attaches_to_turn(event_type: &str) -> bool {
+    matches!(
+        event_type,
+        "assistant_message"
+            | "pre_tool_use"
+            | "post_tool_use"
+            | "post_tool_use_failure"
+            | "permission_request"
+            | "subagent_start"
+            | "subagent_stop"
+            | "stop"
+    )
+}
+
 pub fn event_type_to_status(event_type: &str) -> &str {
     match event_type {
         "post_tool_use_failure" => "error",
@@ -119,6 +181,7 @@ fn str_field(payload: &Value, key: &str) -> Option<String> {
 fn extract_common(payload: &Value) -> SpanFields {
     let mut fields = SpanFields::new();
     fields.session_id = str_field(payload, "session_id");
+    fields.session_name = str_field(payload, "session_name");
     fields.cwd = str_field(payload, "cwd");
     fields.model = str_field(payload, "model");
     fields.source = str_field(payload, "source");
@@ -230,5 +293,17 @@ fn extract_notification(payload: &Value, fields: &mut SpanFields) {
     }
     if !meta.is_empty() {
         fields.metadata = Some(Value::Object(meta));
+    }
+}
+
+fn push_string_attr(attrs: &mut Vec<OtlpAttribute>, key: &str, value: Option<String>) {
+    if let Some(value) = value {
+        attrs.push(OtlpAttribute::string(key, value));
+    }
+}
+
+fn push_json_attr(attrs: &mut Vec<OtlpAttribute>, key: &str, value: Option<Value>) {
+    if let Some(value) = value {
+        attrs.push(OtlpAttribute::json(key, value));
     }
 }

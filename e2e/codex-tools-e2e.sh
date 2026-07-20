@@ -75,13 +75,25 @@ echo ""
 echo "── Step 1: Running Codex (tool calls)"
 BEFORE_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-CODEX_OUTPUT=$(cd /workdir && CODEX_API_KEY="$OPENAI_API_KEY" codex exec --skip-git-repo-check --dangerously-bypass-hook-trust \
+CODEX_OUTPUT=$(cd /workdir && CODEX_API_KEY="$OPENAI_API_KEY" codex exec --skip-git-repo-check \
+  --dangerously-bypass-approvals-and-sandbox \
+  --dangerously-bypass-hook-trust \
   "Do these 2 things in order:
 1. Read /workdir/codex-test.txt.
 2. Run the shell command: echo CODEX_TOOL_TEST_OK.
 After both, reply with DONE." 2>&1 || true)
 echo "Codex output (last 40 lines):"
 echo "$CODEX_OUTPUT" | tail -40
+
+# Codex runs inside this disposable container, so its inner shell sandbox is
+# disabled above. Require the requested tools to succeed instead of accepting
+# hook events produced by failed shell attempts.
+assert_eq "Codex read the test file" "true" \
+  "$(echo "$CODEX_OUTPUT" | grep -q '^Hello from the Codex e2e test file\.$' && echo true || echo false)"
+assert_eq "Codex ran the shell command" "true" \
+  "$(echo "$CODEX_OUTPUT" | grep -q '^CODEX_TOOL_TEST_OK$' && echo true || echo false)"
+assert_eq "Codex completed the requested flow" "true" \
+  "$(echo "$CODEX_OUTPUT" | grep -q '^DONE$' && echo true || echo false)"
 
 sleep 10
 
@@ -112,8 +124,12 @@ done
 
 for et in pre_tool_use post_tool_use; do
   COUNT=$(echo "$SESSION_SPANS" | jq --arg et "$et" 'map(select(.eventType == $et)) | length')
-  assert_gte "has at least 1 $et" 1 "$COUNT"
+  assert_gte "has at least 2 $et events" 2 "$COUNT"
 done
+
+UNIQUE_TOOL_IDS=$(echo "$SESSION_SPANS" | jq \
+  '[.[] | select(.eventType == "pre_tool_use") | .toolUseId] | unique | length')
+assert_gte "persisted 2 distinct tool calls" 2 "$UNIQUE_TOOL_IDS"
 
 echo ""
 echo "── Step 4: Tool span field audit"
@@ -125,6 +141,15 @@ if [ "$PRE_TOOL" != "null" ]; then
 
   assert_neq "pre_tool_use has toolName" "NULL" "$(echo "$PRE_TOOL" | jq -r '.toolName // "NULL"')"
   assert_neq "pre_tool_use has toolInput" "NULL" "$(echo "$PRE_TOOL" | jq -r '.toolInput // "NULL"')"
+fi
+
+SHELL_POST=$(echo "$SESSION_SPANS" | jq \
+  'map(select(.eventType == "post_tool_use" and .toolInput.command == "echo CODEX_TOOL_TEST_OK")) | .[0]')
+if [ "$SHELL_POST" != "null" ]; then
+  assert_eq "shell command response persisted" "true" \
+    "$(echo "$SHELL_POST" | jq -r '.toolResponse // ""' | grep -q 'CODEX_TOOL_TEST_OK' && echo true || echo false)"
+else
+  assert_eq "shell command post_tool_use persisted" "true" "false"
 fi
 
 POST_TOOL=$(echo "$SESSION_SPANS" | jq 'map(select(.eventType == "post_tool_use")) | .[0]')
